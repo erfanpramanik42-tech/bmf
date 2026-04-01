@@ -34,7 +34,5 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     path
   }
   console.error('Firestore Error: ', JSON.stringify(errInfo));
-  // We don't necessarily want to crash the app, but we want to log it clearly.
-  // In some cases we might want to throw, but for snapshot listeners it's better to just log.
-  return errInfo;
+  throw new Error(JSON.stringify(errInfo));
 }

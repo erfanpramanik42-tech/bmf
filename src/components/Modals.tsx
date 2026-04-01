@@ -5,6 +5,8 @@ import { User, AppSettings, Loan } from '../types';
 import { Modal } from './Modal';
 import { Button } from './Button';
 import { hashPin } from '../lib/crypto';
+import { Phone, FileText, Info, TrendingUp, UserCheck, Clipboard } from 'lucide-react';
+import { cn } from '../lib/utils';
 
 interface ModalsProps {
   isAddMemberOpen: boolean;
@@ -15,10 +17,24 @@ interface ModalsProps {
   setIsAddLoanOpen: (open: boolean) => void;
   isAddInstallmentOpen: boolean;
   setIsAddInstallmentOpen: (open: boolean) => void;
+  isRequestOpen: boolean;
+  setIsRequestOpen: (open: boolean) => void;
+  isTermsOpen: boolean;
+  setIsTermsOpen: (open: boolean) => void;
+  isAboutOpen: boolean;
+  setIsAboutOpen: (open: boolean) => void;
+  isInvestDetailsOpen: boolean;
+  setIsInvestDetailsOpen: (open: boolean) => void;
+  isContactsOpen: boolean;
+  setIsContactsOpen: (open: boolean) => void;
+  isDocsOpen: boolean;
+  setIsDocsOpen: (open: boolean) => void;
   currentUser: User;
   settings: AppSettings | null;
   showToast: (msg: string) => void;
   editMember?: User | null;
+  investments?: any[];
+  contacts?: any[];
 }
 
 export const Modals: React.FC<ModalsProps> = ({
@@ -26,8 +42,16 @@ export const Modals: React.FC<ModalsProps> = ({
   isAddDepositOpen, setIsAddDepositOpen,
   isAddLoanOpen, setIsAddLoanOpen,
   isAddInstallmentOpen, setIsAddInstallmentOpen,
+  isRequestOpen, setIsRequestOpen,
+  isTermsOpen, setIsTermsOpen,
+  isAboutOpen, setIsAboutOpen,
+  isInvestDetailsOpen, setIsInvestDetailsOpen,
+  isContactsOpen, setIsContactsOpen,
+  isDocsOpen, setIsDocsOpen,
   currentUser, settings, showToast,
-  editMember
+  editMember,
+  investments = [],
+  contacts = []
 }) => {
   const [members, setMembers] = useState<User[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
@@ -51,6 +75,12 @@ export const Modals: React.FC<ModalsProps> = ({
   const [mPin, setMPin] = useState('');
   const [mAddress, setMAddress] = useState('');
   const [mPhoto, setMPhoto] = useState('');
+  const [mFather, setMFather] = useState('');
+  const [mMother, setMMother] = useState('');
+  const [mNid, setMNid] = useState('');
+  const [mOccupation, setMOccupation] = useState('');
+  const [mNomineeName, setMNomineeName] = useState('');
+  const [mNomineeRelation, setMNomineeRelation] = useState('');
   const [mLoading, setMLoading] = useState(false);
 
   useEffect(() => {
@@ -59,12 +89,24 @@ export const Modals: React.FC<ModalsProps> = ({
       setMPhone(editMember.phone);
       setMAddress(editMember.address || '');
       setMPhoto(editMember.photo || '');
+      setMFather(editMember.father_name || '');
+      setMMother(editMember.mother_name || '');
+      setMNid(editMember.nid || '');
+      setMOccupation(editMember.occupation || '');
+      setMNomineeName(editMember.nominee_name || '');
+      setMNomineeRelation(editMember.nominee_relation || '');
       setMPin(''); // Don't show hashed pin
     } else {
       setMName('');
       setMPhone('');
       setMAddress('');
       setMPhoto('');
+      setMFather('');
+      setMMother('');
+      setMNid('');
+      setMOccupation('');
+      setMNomineeName('');
+      setMNomineeRelation('');
       setMPin('');
     }
   }, [editMember, isAddMemberOpen]);
@@ -75,15 +117,28 @@ export const Modals: React.FC<ModalsProps> = ({
     try {
       const pin_hash = mPin ? await hashPin(mPhone, mPin) : (editMember?.pin_hash || '');
       
+      const memberData = {
+        name: mName, 
+        phone: mPhone, 
+        pin_hash, 
+        address: mAddress, 
+        photo: mPhoto,
+        father_name: mFather,
+        mother_name: mMother,
+        nid: mNid,
+        occupation: mOccupation,
+        nominee_name: mNomineeName,
+        nominee_relation: mNomineeRelation
+      };
+
       if (editMember) {
-        await updateDoc(doc(db, 'members', editMember.id), {
-          name: mName, phone: mPhone, pin_hash, address: mAddress, photo: mPhoto
-        });
+        await updateDoc(doc(db, 'members', editMember.id), memberData);
         showToast('✅ সদস্য তথ্য আপডেট করা হয়েছে');
       } else {
         await addDoc(collection(db, 'members'), {
-          name: mName, phone: mPhone, pin_hash, address: mAddress, photo: mPhoto,
-          role: 'member', join_date: new Date().toISOString().split('T')[0]
+          ...memberData,
+          role: 'member', 
+          join_date: new Date().toISOString().split('T')[0]
         });
         showToast('✅ সদস্য যোগ করা হয়েছে');
       }
@@ -169,32 +224,120 @@ export const Modals: React.FC<ModalsProps> = ({
 
   const fmt = (num: number) => Math.round(num).toLocaleString('en-IN');
 
+  // --- Request ---
+  const [reqType, setReqType] = useState<'deposit' | 'loan' | 'installment'>('deposit');
+  const [reqAmount, setReqAmount] = useState(0);
+  const [reqMonth, setReqMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [reqNote, setReqNote] = useState('');
+  const [reqLoading, setReqLoading] = useState(false);
+
+  const handleAddRequest = async () => {
+    if (!reqAmount) { showToast('⚠️ পরিমাণ লিখুন'); return; }
+    setReqLoading(true);
+    try {
+      await addDoc(collection(db, 'requests'), {
+        member_id: currentUser.id,
+        type: reqType,
+        data: { 
+          amount: Number(reqAmount), 
+          note: reqNote,
+          month: reqType === 'deposit' ? reqMonth : null
+        },
+        status: 'pending',
+        created_at: new Date().toISOString()
+      });
+      showToast('✅ অনুরোধ পাঠানো হয়েছে');
+      setIsRequestOpen(false);
+      setReqAmount(0);
+      setReqNote('');
+    } catch (e) { showToast('❌ ব্যর্থ হয়েছে'); }
+    finally { setReqLoading(false); }
+  };
+
   return (
     <>
-      {/* Add Member Modal */}
-      <Modal isOpen={isAddMemberOpen} onClose={() => setIsAddMemberOpen(false)} title={editMember ? "👤 সদস্য তথ্য এডিট করুন" : "👤 নতুন সদস্য যোগ করুন"}>
+      {/* Request Modal */}
+      <Modal isOpen={isRequestOpen} onClose={() => setIsRequestOpen(false)} title="📝 অনুরোধ পাঠান">
         <div className="space-y-4">
           <div>
-            <label className="text-[11px] font-bold text-app-text-secondary mb-1 block">নাম *</label>
-            <input type="text" value={mName} onChange={(e) => setMName(e.target.value)} className="w-full p-3 border-2 border-app-border rounded-app-sm text-sm outline-none focus:border-primary transition-all" placeholder="সদস্যের নাম" />
+            <label className="text-[11px] font-bold text-app-text-secondary mb-1 block">অনুরোধের ধরন *</label>
+            <select value={reqType} onChange={(e) => setReqType(e.target.value as any)} className="w-full p-3 border-2 border-app-border rounded-app-sm text-sm outline-none focus:border-primary transition-all bg-white">
+              <option value="deposit">মাসিক জমা</option>
+              <option value="loan">ঋণ</option>
+              <option value="installment">কিস্তি</option>
+            </select>
           </div>
           <div>
-            <label className="text-[11px] font-bold text-app-text-secondary mb-1 block">ফোন নম্বর *</label>
-            <input type="tel" value={mPhone} onChange={(e) => setMPhone(e.target.value)} className="w-full p-3 border-2 border-app-border rounded-app-sm text-sm outline-none focus:border-primary transition-all" placeholder="০১XXXXXXXXX" />
+            <label className="text-[11px] font-bold text-app-text-secondary mb-1 block">পরিমাণ (৳) *</label>
+            <input type="number" value={reqAmount} onChange={(e) => setReqAmount(Number(e.target.value))} className="w-full p-3 border-2 border-app-border rounded-app-sm text-sm outline-none focus:border-primary transition-all" placeholder="৳০০০" />
           </div>
+          {reqType === 'deposit' && (
+            <div>
+              <label className="text-[11px] font-bold text-app-text-secondary mb-1 block">মাস *</label>
+              <input type="month" value={reqMonth} onChange={(e) => setReqMonth(e.target.value)} className="w-full p-3 border-2 border-app-border rounded-app-sm text-sm outline-none focus:border-primary transition-all bg-white" />
+            </div>
+          )}
           <div>
-            <label className="text-[11px] font-bold text-app-text-secondary mb-1 block">পিন কোড {editMember && '(পরিবর্তন করতে চাইলে দিন)'}</label>
-            <input type="password" value={mPin} onChange={(e) => setMPin(e.target.value)} maxLength={4} className="w-full p-3 border-2 border-app-border rounded-app-sm text-sm outline-none focus:border-primary transition-all" placeholder={editMember ? "নতুন পিন (ঐচ্ছিক)" : "৪ সংখ্যার পিন"} />
-          </div>
-          <div>
-            <label className="text-[11px] font-bold text-app-text-secondary mb-1 block">ঠিকানা</label>
-            <input type="text" value={mAddress} onChange={(e) => setMAddress(e.target.value)} className="w-full p-3 border-2 border-app-border rounded-app-sm text-sm outline-none focus:border-primary transition-all" placeholder="ঐচ্ছিক" />
-          </div>
-          <div>
-            <label className="text-[11px] font-bold text-app-text-secondary mb-1 block">প্রোফাইল ছবি (URL)</label>
-            <input type="text" value={mPhoto} onChange={(e) => setMPhoto(e.target.value)} className="w-full p-3 border-2 border-app-border rounded-app-sm text-sm outline-none focus:border-primary transition-all" placeholder="https://..." />
+            <label className="text-[11px] font-bold text-app-text-secondary mb-1 block">নোট (ঐচ্ছিক)</label>
+            <textarea value={reqNote} onChange={(e) => setReqNote(e.target.value)} className="w-full p-3 border-2 border-app-border rounded-app-sm text-sm outline-none focus:border-primary transition-all" placeholder="বিস্তারিত লিখুন..." rows={3} />
           </div>
           <div className="flex gap-2 pt-2">
+            <Button variant="gray" className="flex-1" onClick={() => setIsRequestOpen(false)}>বাতিল</Button>
+            <Button className="flex-2" onClick={handleAddRequest} loading={reqLoading}>✅ অনুরোধ পাঠান</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Add Member Modal */}
+      <Modal isOpen={isAddMemberOpen} onClose={() => setIsAddMemberOpen(false)} title={editMember ? "👤 সদস্য তথ্য এডিট করুন" : "👤 নতুন সদস্য যোগ করুন"}>
+        <div className="space-y-4 max-h-[70vh] overflow-y-auto px-1 pb-2">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2">
+              <label className="text-[11px] font-bold text-app-text-secondary mb-1 block">নাম *</label>
+              <input type="text" value={mName} onChange={(e) => setMName(e.target.value)} className="w-full p-3 border-2 border-app-border rounded-app-sm text-sm outline-none focus:border-primary transition-all" placeholder="সদস্যের নাম" />
+            </div>
+            <div>
+              <label className="text-[11px] font-bold text-app-text-secondary mb-1 block">ফোন নম্বর *</label>
+              <input type="tel" value={mPhone} onChange={(e) => setMPhone(e.target.value)} className="w-full p-3 border-2 border-app-border rounded-app-sm text-sm outline-none focus:border-primary transition-all" placeholder="০১XXXXXXXXX" />
+            </div>
+            <div>
+              <label className="text-[11px] font-bold text-app-text-secondary mb-1 block">পিন কোড {editMember && '(ঐচ্ছিক)'}</label>
+              <input type="password" value={mPin} onChange={(e) => setMPin(e.target.value)} maxLength={4} className="w-full p-3 border-2 border-app-border rounded-app-sm text-sm outline-none focus:border-primary transition-all" placeholder="৪ সংখ্যার পিন" />
+            </div>
+            <div>
+              <label className="text-[11px] font-bold text-app-text-secondary mb-1 block">পিতার নাম</label>
+              <input type="text" value={mFather} onChange={(e) => setMFather(e.target.value)} className="w-full p-3 border-2 border-app-border rounded-app-sm text-sm outline-none focus:border-primary transition-all" placeholder="পিতার নাম" />
+            </div>
+            <div>
+              <label className="text-[11px] font-bold text-app-text-secondary mb-1 block">মাতার নাম</label>
+              <input type="text" value={mMother} onChange={(e) => setMMother(e.target.value)} className="w-full p-3 border-2 border-app-border rounded-app-sm text-sm outline-none focus:border-primary transition-all" placeholder="মাতার নাম" />
+            </div>
+            <div>
+              <label className="text-[11px] font-bold text-app-text-secondary mb-1 block">এনআইডি নম্বর</label>
+              <input type="text" value={mNid} onChange={(e) => setMNid(e.target.value)} className="w-full p-3 border-2 border-app-border rounded-app-sm text-sm outline-none focus:border-primary transition-all" placeholder="NID Number" />
+            </div>
+            <div>
+              <label className="text-[11px] font-bold text-app-text-secondary mb-1 block">পেশা</label>
+              <input type="text" value={mOccupation} onChange={(e) => setMOccupation(e.target.value)} className="w-full p-3 border-2 border-app-border rounded-app-sm text-sm outline-none focus:border-primary transition-all" placeholder="পেশা" />
+            </div>
+            <div className="col-span-2">
+              <label className="text-[11px] font-bold text-app-text-secondary mb-1 block">ঠিকানা</label>
+              <input type="text" value={mAddress} onChange={(e) => setMAddress(e.target.value)} className="w-full p-3 border-2 border-app-border rounded-app-sm text-sm outline-none focus:border-primary transition-all" placeholder="বর্তমান ঠিকানা" />
+            </div>
+            <div>
+              <label className="text-[11px] font-bold text-app-text-secondary mb-1 block">নমিনীর নাম</label>
+              <input type="text" value={mNomineeName} onChange={(e) => setMNomineeName(e.target.value)} className="w-full p-3 border-2 border-app-border rounded-app-sm text-sm outline-none focus:border-primary transition-all" placeholder="নমিনীর নাম" />
+            </div>
+            <div>
+              <label className="text-[11px] font-bold text-app-text-secondary mb-1 block">নমিনীর সাথে সম্পর্ক</label>
+              <input type="text" value={mNomineeRelation} onChange={(e) => setMNomineeRelation(e.target.value)} className="w-full p-3 border-2 border-app-border rounded-app-sm text-sm outline-none focus:border-primary transition-all" placeholder="সম্পর্ক" />
+            </div>
+            <div className="col-span-2">
+              <label className="text-[11px] font-bold text-app-text-secondary mb-1 block">প্রোফাইল ছবি (URL)</label>
+              <input type="text" value={mPhoto} onChange={(e) => setMPhoto(e.target.value)} className="w-full p-3 border-2 border-app-border rounded-app-sm text-sm outline-none focus:border-primary transition-all" placeholder="https://..." />
+            </div>
+          </div>
+          <div className="flex gap-2 pt-2 sticky bottom-0 bg-white pb-1">
             <Button variant="gray" className="flex-1" onClick={() => setIsAddMemberOpen(false)}>বাতিল</Button>
             <Button className="flex-2" onClick={handleAddMember} loading={mLoading}>{editMember ? "✅ আপডেট করুন" : "✅ সদস্য যোগ করুন"}</Button>
           </div>
@@ -299,6 +442,101 @@ export const Modals: React.FC<ModalsProps> = ({
           <div className="flex gap-2 pt-2">
             <Button variant="gray" className="flex-1" onClick={() => setIsAddInstallmentOpen(false)}>বাতিল</Button>
             <Button className="flex-2" onClick={handleAddInstallment} loading={iLoading}>✅ কিস্তি যোগ করুন</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Static Content Modals */}
+      <Modal isOpen={isInvestDetailsOpen} onClose={() => setIsInvestDetailsOpen(false)} title="📊 বিনিয়োগের বিবরণ">
+        <div className="space-y-4 max-h-[60vh] overflow-y-auto p-2">
+          {investments.length === 0 ? (
+            <div className="text-center py-8 text-app-text-muted">কোনো বিনিয়োগ পাওয়া যায়নি</div>
+          ) : (
+            investments.map(inv => (
+              <div key={inv.id} className="p-4 rounded-2xl bg-white border border-app-border shadow-sm">
+                <div className="flex justify-between items-start mb-2">
+                  <h4 className="font-bold text-app-text-primary">{inv.title}</h4>
+                  <span className={cn(
+                    "text-[10px] px-2 py-0.5 rounded-full font-bold uppercase",
+                    inv.status === 'active' ? "bg-accent/10 text-accent" : "bg-primary/10 text-primary"
+                  )}>
+                    {inv.status === 'active' ? 'চলমান' : 'গৃহীত'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <div className="text-app-text-muted">বিনিয়োগ:</div>
+                    <div className="font-bold">৳{inv.amount.toLocaleString('en-IN')}</div>
+                  </div>
+                  <div>
+                    <div className="text-app-text-muted">লাভ:</div>
+                    <div className="font-bold text-primary">৳{inv.profit.toLocaleString('en-IN')}</div>
+                  </div>
+                  {inv.received_amount && (
+                    <div className="col-span-2 pt-1 border-t border-app-border mt-1">
+                      <div className="text-app-text-muted">মোট প্রাপ্তি:</div>
+                      <div className="font-bold text-primary">৳{inv.received_amount.toLocaleString('en-IN')}</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </Modal>
+
+      <Modal isOpen={isContactsOpen} onClose={() => setIsContactsOpen(false)} title="📞 যোগাযোগের তালিকা">
+        <div className="space-y-3 max-h-[60vh] overflow-y-auto p-2">
+          {contacts.length === 0 ? (
+            <div className="text-center py-8 text-app-text-muted">কোনো কন্টাক্ট পাওয়া যায়নি</div>
+          ) : (
+            contacts.map(contact => (
+              <div key={contact.id} className="p-4 rounded-2xl bg-white border border-app-border shadow-sm flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xl font-bold">
+                  {contact.photo ? <img src={contact.photo} className="w-full h-full object-cover rounded-full" /> : contact.name[0]}
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-bold text-app-text-primary">{contact.name}</h4>
+                  <p className="text-xs text-app-text-muted">{contact.position}</p>
+                  <p className="text-xs font-bold text-primary mt-0.5">{contact.phone}</p>
+                </div>
+                <a href={`tel:${contact.phone}`} className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center shadow-lg active:scale-90 transition-all">
+                  <Phone className="w-5 h-5" />
+                </a>
+              </div>
+            ))
+          )}
+        </div>
+      </Modal>
+
+      <Modal isOpen={isDocsOpen} onClose={() => setIsDocsOpen(false)} title="📄 প্রয়োজনীয় ডকুমেন্টস">
+        <div className="text-center py-12 space-y-4">
+          <div className="text-5xl opacity-20">📂</div>
+          <p className="text-app-text-muted text-sm">বর্তমানে কোনো ডকুমেন্ট আপলোড করা নেই।</p>
+        </div>
+      </Modal>
+
+      <Modal isOpen={isTermsOpen} onClose={() => setIsTermsOpen(false)} title="ফাউন্ডেশনের শর্তাবলী">
+        <div className="prose prose-sm max-h-[60vh] overflow-y-auto p-2">
+          <h4 className="text-primary">১. সদস্যপদ</h4>
+          <p>ফাউন্ডেশনের সদস্য হতে হলে নির্ধারিত ফি প্রদান করতে হবে এবং নিয়মিত মাসিক জমা দিতে হবে।</p>
+          <h4 className="text-primary">২. সঞ্চয় ও ঋণ</h4>
+          <p>প্রতি মাসের ১০ তারিখের মধ্যে মাসিক জমা দিতে হবে। ঋণ গ্রহণের ক্ষেত্রে নির্দিষ্ট শর্তাবলী প্রযোজ্য হবে।</p>
+        </div>
+      </Modal>
+
+      <Modal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} title="অ্যাপ সম্পর্কে">
+        <div className="text-center p-4 space-y-4">
+          <div className="text-5xl">🤝</div>
+          <div>
+            <h3 className="font-serif text-lg font-bold text-primary">বন্ধুমহল ফাউন্ডেশন</h3>
+            <p className="text-xs text-app-text-muted">ভার্সন ৩.০.০</p>
+          </div>
+          <p className="text-sm text-app-text-secondary leading-relaxed">
+            এটি একটি সঞ্চয় ও ঋণ ব্যবস্থাপনা অ্যাপ। বন্ধুদের মধ্যে স্বচ্ছতা ও সহজ হিসাব রাখার জন্য এটি তৈরি করা হয়েছে।
+          </p>
+          <div className="pt-4 border-t border-app-border">
+            <p className="text-[10px] text-app-text-muted">© ২০২৪ বন্ধুমহল ফাউন্ডেশন। সর্বস্বত্ব সংরক্ষিত।</p>
           </div>
         </div>
       </Modal>

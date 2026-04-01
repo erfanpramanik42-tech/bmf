@@ -5,8 +5,9 @@ import { User, Deposit, Loan, Installment } from '../types';
 import { Modal } from './Modal';
 import { Button } from './Button';
 import { cn } from '../lib/utils';
-import { Phone, MapPin, Calendar, Edit2, Trash2, X, Hourglass, CheckCircle2 } from 'lucide-react';
+import { Phone, MapPin, Calendar, Edit2, Trash2, X, Hourglass, CheckCircle2, Wallet, Landmark, Receipt, History, ArrowRight } from 'lucide-react';
 import { handleFirestoreError, OperationType } from '../lib/firestore-utils';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface MemberDetailsProps {
   isOpen: boolean;
@@ -18,8 +19,8 @@ interface MemberDetailsProps {
 }
 
 const MONTHS_BN = [
-  'জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
-  'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'
+  'জানু', 'ফেব্রু', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
+  'জুলাই', 'আগস্ট', 'সেপ্টে', 'অক্টো', 'নভে', 'ডিসে'
 ];
 
 export const MemberDetails: React.FC<MemberDetailsProps> = ({
@@ -62,7 +63,6 @@ export const MemberDetails: React.FC<MemberDetailsProps> = ({
   const fmt = (num: number) => Math.round(num).toLocaleString('en-IN');
 
   const totalDeposit = deposits.filter(d => !d.fine).reduce((s, d) => s + n(d.amount), 0);
-  const totalLoanAmount = loans.reduce((s, l) => s + n(l.amount), 0);
   const activeLoans = loans.filter(l => l.status === 'active');
   const totalInstallmentPaid = installments.reduce((s, i) => s + n(i.amount), 0);
 
@@ -86,7 +86,6 @@ export const MemberDetails: React.FC<MemberDetailsProps> = ({
     const currentMonth = now.getMonth();
     
     const isFuture = selectedYear > currentYear || (selectedYear === currentYear && monthIdx > currentMonth);
-    const isPastOrCurrent = !isFuture;
 
     if (deposit) return { label: 'দিয়েছেন', status: 'paid', amount: deposit.amount };
     if (isFuture) return { label: 'আসেনি', status: 'future' };
@@ -95,104 +94,233 @@ export const MemberDetails: React.FC<MemberDetailsProps> = ({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="" noPadding hideHeader>
-      <div className="bg-app-bg min-h-[80vh] flex flex-col">
-        {/* Profile Header */}
-        <div className="bg-linear-to-br from-primary-dark to-primary p-6 pb-8 rounded-b-[32px] text-white relative shadow-lg">
+      <div className="bg-app-bg min-h-[90vh] flex flex-col pb-8">
+        {/* Profile Header - Immersive & Premium */}
+        <div className="relative h-56 shrink-0 overflow-hidden rounded-b-[48px] shadow-2xl">
+          {/* Background Image/Gradient */}
+          <div className="absolute inset-0 bg-linear-to-br from-primary-dark via-primary to-primary-light">
+            <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_50%_120%,rgba(255,255,255,0.4),transparent)]" />
+          </div>
+
           <button 
             onClick={onClose}
-            className="absolute top-4 right-4 w-8 h-8 bg-white/20 rounded-full flex items-center justify-center text-white active:scale-90 transition-all"
+            className="absolute top-5 right-5 w-10 h-10 bg-white/10 backdrop-blur-xl border border-white/20 rounded-full flex items-center justify-center text-white active:scale-90 transition-all z-20"
           >
             <X className="w-5 h-5" />
           </button>
 
-          <div className="flex items-center gap-4">
-            <div className="w-20 h-20 rounded-full bg-linear-to-br from-yellow-400 to-green-500 border-4 border-white/20 flex items-center justify-center text-3xl font-bold shadow-inner overflow-hidden shrink-0">
-              {member.photo ? (
-                <img src={member.photo} alt={member.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-              ) : (
-                member.name[0].toUpperCase()
+          <div className="absolute inset-0 flex flex-col items-center justify-center pt-4">
+            <motion.div 
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              className="relative"
+            >
+              <div className="w-28 h-28 rounded-full bg-white/10 backdrop-blur-md border-4 border-white/30 flex items-center justify-center text-4xl font-bold shadow-2xl overflow-hidden mb-3">
+                {member.photo ? (
+                  <img src={member.photo} alt={member.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                ) : (
+                  <span className="font-serif text-white">{member.name[0].toUpperCase()}</span>
+                )}
+              </div>
+              {currentUser.role === 'admin' && (
+                <button 
+                  onClick={() => onEdit(member)}
+                  className="absolute bottom-2 right-0 w-8 h-8 bg-accent text-white rounded-full flex items-center justify-center shadow-lg border-2 border-primary active:scale-90 transition-all"
+                >
+                  <Edit2 className="w-4 h-4" />
+                </button>
               )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <h2 className="text-xl font-bold truncate">{member.name}</h2>
-              <div className="flex items-center gap-1.5 text-white/80 text-xs mt-1">
-                <Phone className="w-3 h-3" />
-                <span>{member.phone}</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-white/70 text-[10px] mt-1.5">
-                <MapPin className="w-3 h-3" />
-                <span className="truncate">{member.address || 'ঠিকানা দেওয়া নেই'}</span>
-                <span className="mx-1">•</span>
-                <Calendar className="w-3 h-3" />
-                <span>যোগদান: {member.join_date || 'অজানা'}</span>
-              </div>
-            </div>
+            </motion.div>
+            <motion.h2 
+              initial={{ y: 10, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.1 }}
+              className="text-2xl font-bold font-serif text-white tracking-tight"
+            >
+              {member.name}
+            </motion.h2>
+            <motion.div 
+              initial={{ y: 10, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              className="flex items-center gap-2 mt-1 text-white/90 text-sm font-medium"
+            >
+              <Phone className="w-3.5 h-3.5" />
+              <span>{member.phone}</span>
+            </motion.div>
           </div>
         </div>
 
-        <div className="p-4 space-y-4 -mt-4">
-          {/* Stats Card */}
-          <div className="bg-white rounded-2xl shadow-app overflow-hidden divide-y divide-app-border">
-            <div className="flex justify-between items-center p-3 px-4">
-              <span className="text-sm text-app-text-secondary">মোট জমা</span>
-              <span className="text-sm font-bold text-primary">৳{fmt(totalDeposit)}</span>
+        <div className="px-5 space-y-5 -mt-8 relative z-10">
+          {/* Stats Bento Grid */}
+          <div className="grid grid-cols-2 gap-3">
+            <StatCard 
+              icon={<Wallet className="w-4 h-4" />} 
+              label="মোট সঞ্চয়" 
+              value={`৳${fmt(totalDeposit)}`} 
+              color="text-primary"
+              bgColor="bg-primary/10"
+              delay={0.3}
+            />
+            <StatCard 
+              icon={<Landmark className="w-4 h-4" />} 
+              label="চলমান ঋণ" 
+              value={`${activeLoans.length}টি`} 
+              color="text-danger"
+              bgColor="bg-danger/10"
+              delay={0.4}
+            />
+            <StatCard 
+              icon={<Receipt className="w-4 h-4" />} 
+              label="পরিশোধিত কিস্তি" 
+              value={`৳${fmt(totalInstallmentPaid)}`} 
+              color="text-blue-600"
+              bgColor="bg-blue-600/10"
+              delay={0.5}
+            />
+            <StatCard 
+              icon={<History className="w-4 h-4" />} 
+              label="মোট ঋণ সংখ্যা" 
+              value={`${loans.length}টি`} 
+              color="text-app-text-secondary"
+              bgColor="bg-app-bg-secondary"
+              delay={0.6}
+            />
+          </div>
+
+          {/* Quick Info Bar */}
+          <div className="bg-white/80 backdrop-blur-md border border-white/50 rounded-2xl p-3 flex items-center justify-between shadow-sm">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center text-accent">
+                <Calendar className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="text-[10px] text-app-text-muted font-bold uppercase tracking-wider">যোগদান</div>
+                <div className="text-xs font-bold text-app-text-secondary">{member.join_date || 'অজানা'}</div>
+              </div>
             </div>
-            <div className="flex justify-between items-center p-3 px-4">
-              <span className="text-sm text-app-text-secondary">মোট ঋণ</span>
-              <span className="text-sm font-bold text-app-text-primary">{loans.length}টি</span>
-            </div>
-            <div className="flex justify-between items-center p-3 px-4">
-              <span className="text-sm text-app-text-secondary">সক্রিয় ঋণ</span>
-              <span className="text-sm font-bold text-danger">{activeLoans.length}টি</span>
-            </div>
-            <div className="flex justify-between items-center p-3 px-4">
-              <span className="text-sm text-app-text-secondary">মোট কিস্তি পরিশোধ</span>
-              <span className="text-sm font-bold text-app-text-primary">৳{fmt(totalInstallmentPaid)}</span>
+            <div className="h-8 w-px bg-app-border/50" />
+            <div className="flex items-center gap-2 flex-1 min-w-0 ml-2">
+              <div className="w-8 h-8 shrink-0 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                <MapPin className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-[10px] text-app-text-muted font-bold uppercase tracking-wider">ঠিকানা</div>
+                <div className="text-xs font-bold text-app-text-secondary break-words">{member.address || 'দেওয়া নেই'}</div>
+              </div>
             </div>
           </div>
 
-          {/* Annual History Card */}
-          <div className="bg-white rounded-2xl shadow-app p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-bold flex items-center gap-2">
-                📅 বার্ষিক জমার হিসাব
-              </h3>
-              <input 
-                type="number" 
-                value={selectedYear}
-                onChange={(e) => setSelectedYear(Number(e.target.value))}
-                className="w-24 p-1.5 px-3 border-2 border-app-border rounded-lg text-sm font-bold outline-none focus:border-primary transition-all text-center"
-              />
+          {/* Personal Details Section */}
+          <div className="bg-white rounded-[32px] shadow-xl border border-app-border/30 p-5 space-y-4">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-1.5 h-6 bg-accent rounded-full" />
+              <h3 className="text-sm font-bold text-app-text-primary font-serif">ব্যক্তিগত তথ্য</h3>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-y-4 gap-x-6">
+              <DetailItem label="পিতার নাম" value={member.father_name} />
+              <DetailItem label="মাতার নাম" value={member.mother_name} />
+              <DetailItem label="এনআইডি" value={member.nid} />
+              <DetailItem label="পেশা" value={member.occupation} />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="pt-4 border-t border-app-border/50">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-1.5 h-4 bg-blue-500 rounded-full" />
+                <h4 className="text-xs font-bold text-app-text-secondary">নমিনী তথ্য</h4>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <DetailItem label="নমিনীর নাম" value={member.nominee_name} />
+                <DetailItem label="সম্পর্ক" value={member.nominee_relation} />
+              </div>
+            </div>
+          </div>
+
+          {/* Active Loans Section (if any) */}
+          {activeLoans.length > 0 && (
+            <div className="bg-white rounded-[32px] shadow-xl border border-app-border/30 p-5 space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-1.5 h-6 bg-danger rounded-full" />
+                <h3 className="text-sm font-bold text-app-text-primary font-serif">সক্রিয় ঋণসমূহ</h3>
+              </div>
+              <div className="space-y-3">
+                {activeLoans.map(loan => {
+                  const paid = installments.filter(i => i.loan_id === loan.id).reduce((s, i) => s + n(i.amount), 0);
+                  const remaining = n(loan.total_payable) - paid;
+                  const progress = (paid / n(loan.total_payable)) * 100;
+                  
+                  return (
+                    <div key={loan.id} className="p-3 rounded-2xl bg-danger/5 border border-danger/10">
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <div className="text-xs font-bold text-app-text-primary">৳{fmt(loan.amount)} (মূল)</div>
+                          <div className="text-[10px] text-app-text-muted">কিস্তি: {loan.installments}টি</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-xs font-bold text-danger">৳{fmt(remaining)} বাকি</div>
+                          <div className="text-[10px] text-app-text-muted">মোট: ৳{fmt(loan.total_payable)}</div>
+                        </div>
+                      </div>
+                      <div className="h-1.5 w-full bg-danger/10 rounded-full overflow-hidden">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: `${progress}%` }}
+                          className="h-full bg-danger"
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Annual History - Ultra Compact Grid */}
+          <div className="bg-white rounded-[32px] shadow-xl border border-app-border/30 p-5">
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-6 bg-primary rounded-full" />
+                <h3 className="text-sm font-bold text-app-text-primary font-serif">
+                  বার্ষিক জমার বিবরণ
+                </h3>
+              </div>
+              <div className="flex items-center bg-app-bg-secondary/50 rounded-full px-3 py-1 border border-app-border/50">
+                <input 
+                  type="number" 
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(Number(e.target.value))}
+                  className="w-14 bg-transparent text-xs font-bold outline-none text-center text-primary"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-4 gap-2">
               {MONTHS_BN.map((m, i) => {
                 const { label, status, amount } = getMonthStatus(i);
                 return (
                   <div 
                     key={i}
                     className={cn(
-                      "p-3 rounded-xl border-2 transition-all flex items-center justify-between",
-                      status === 'paid' ? "bg-green-50 border-green-100" : 
-                      status === 'missed' ? "bg-red-50 border-red-100" : 
-                      "bg-white border-app-border"
+                      "relative p-2 rounded-2xl border transition-all flex flex-col items-center justify-center gap-1 min-h-[64px]",
+                      status === 'paid' ? "bg-primary/5 border-primary/20" : 
+                      status === 'missed' ? "bg-danger/5 border-danger/20" : 
+                      "bg-app-bg-secondary/20 border-transparent"
                     )}
                   >
-                    <div>
-                      <div className="text-[11px] font-bold text-app-text-primary">{m}</div>
-                      <div className={cn(
-                        "text-[10px] font-semibold mt-0.5",
-                        status === 'paid' ? "text-primary" : 
-                        status === 'missed' ? "text-danger" : 
-                        "text-app-text-muted"
-                      )}>
-                        {status === 'paid' ? `৳${fmt(amount || 0)}` : label}
-                      </div>
-                    </div>
+                    <div className="text-[9px] font-bold text-app-text-muted uppercase tracking-tighter">{m}</div>
                     <div className="shrink-0">
-                      {status === 'paid' && <CheckCircle2 className="w-5 h-5 text-primary" />}
-                      {status === 'missed' && <X className="w-5 h-5 text-danger" />}
-                      {status === 'future' && <Hourglass className="w-5 h-5 text-app-text-muted opacity-50" />}
+                      {status === 'paid' && <CheckCircle2 className="w-4 h-4 text-primary" />}
+                      {status === 'missed' && <X className="w-4 h-4 text-danger" />}
+                      {status === 'future' && <Hourglass className="w-4 h-4 text-app-text-muted opacity-30" />}
+                    </div>
+                    <div className={cn(
+                      "text-[9px] font-black",
+                      status === 'paid' ? "text-primary" : 
+                      status === 'missed' ? "text-danger" : 
+                      "text-app-text-muted/60"
+                    )}>
+                      {status === 'paid' ? `৳${fmt(amount || 0)}` : label}
                     </div>
                   </div>
                 );
@@ -200,32 +328,22 @@ export const MemberDetails: React.FC<MemberDetailsProps> = ({
             </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex gap-3 pt-2">
-            <Button 
-              variant="gray" 
-              className="flex-1 py-3.5 rounded-xl font-bold"
+          {/* Action Footer */}
+          <div className="flex items-center gap-3 pt-2">
+            <button 
               onClick={onClose}
+              className="flex-1 bg-app-bg-secondary hover:bg-app-border text-app-text-secondary font-bold py-4 rounded-2xl text-xs transition-all active:scale-95 flex items-center justify-center gap-2"
             >
-              বন্ধ
-            </Button>
+              বন্ধ করুন
+            </button>
             {currentUser.role === 'admin' && (
-              <>
-                <button 
-                  onClick={() => onEdit(member)}
-                  className="w-14 h-14 bg-white border-2 border-app-border rounded-xl flex flex-col items-center justify-center text-primary active:scale-95 transition-all shadow-sm"
-                >
-                  <Edit2 className="w-5 h-5" />
-                  <span className="text-[9px] font-bold mt-1">এডিট</span>
-                </button>
-                <button 
-                  onClick={handleDelete}
-                  className="w-14 h-14 bg-danger text-white rounded-xl flex flex-col items-center justify-center active:scale-95 transition-all shadow-md"
-                >
-                  <Trash2 className="w-5 h-5" />
-                  <span className="text-[9px] font-bold mt-1">মুছুন</span>
-                </button>
-              </>
+              <button 
+                onClick={handleDelete}
+                className="w-14 h-14 bg-danger/10 text-danger border border-danger/20 rounded-2xl flex items-center justify-center active:scale-90 transition-all shadow-sm"
+                title="মুছুন"
+              >
+                <Trash2 className="w-5 h-5" />
+              </button>
             )}
           </div>
         </div>
@@ -233,3 +351,40 @@ export const MemberDetails: React.FC<MemberDetailsProps> = ({
     </Modal>
   );
 };
+
+interface StatCardProps {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  color: string;
+  bgColor: string;
+  delay?: number;
+}
+
+const StatCard: React.FC<StatCardProps> = ({ icon, label, value, color, bgColor, delay = 0 }) => (
+  <motion.div 
+    initial={{ y: 20, opacity: 0 }}
+    animate={{ y: 0, opacity: 1 }}
+    transition={{ delay }}
+    className="p-4 rounded-[28px] border border-app-border/20 shadow-sm flex flex-col gap-2 bg-white relative overflow-hidden group"
+  >
+    <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform", bgColor, color)}>
+      {icon}
+    </div>
+    <div>
+      <div className="text-[10px] text-app-text-muted font-bold uppercase tracking-wider mb-0.5">{label}</div>
+      <div className={cn("text-base font-black tracking-tight", color)}>{value}</div>
+    </div>
+    {/* Decorative background element */}
+    <div className={cn("absolute -right-2 -bottom-2 w-12 h-12 opacity-5 rounded-full", bgColor)} />
+  </motion.div>
+);
+
+const DetailItem: React.FC<{ label: string; value?: string }> = ({ label, value }) => (
+  <div className="min-w-0">
+    <div className="text-[10px] text-app-text-muted font-bold uppercase tracking-wider mb-0.5">{label}</div>
+    <div className="text-xs font-bold text-app-text-secondary break-words">{value || 'দেওয়া নেই'}</div>
+  </div>
+);
+
+

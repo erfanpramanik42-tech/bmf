@@ -1,17 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
-import { Deposit, Loan, Installment, User, AppSettings } from '../types';
+import { collection, onSnapshot, query, orderBy, doc } from 'firebase/firestore';
+import { Deposit, Loan, Installment, User, AppSettings, Investment, Expense, CashEntry } from '../types';
 import { Card } from '../components/Card';
 import { cn } from '../lib/utils';
-
-import { doc } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../lib/firestore-utils';
+import { TrendingUp, TrendingDown, Wallet, Banknote, PieChart, Users, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
 export const Reports: React.FC = () => {
   const [deposits, setDeposits] = useState<Deposit[]>([]);
   const [members, setMembers] = useState<User[]>([]);
   const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [loans, setLoans] = useState<Loan[]>([]);
+  const [installments, setInstallments] = useState<Installment[]>([]);
+  const [investments, setInvestments] = useState<Investment[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [cashEntries, setCashEntries] = useState<CashEntry[]>([]);
   const [year, setYear] = useState(new Date().getFullYear().toString());
   const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
 
@@ -28,23 +32,114 @@ export const Reports: React.FC = () => {
       if (doc.exists()) setSettings(doc.data() as AppSettings);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'settings/main'));
 
+    const unsubLoans = onSnapshot(collection(db, 'loans'), (snap) => {
+      setLoans(snap.docs.map(d => ({ ...d.data(), id: d.id } as Loan)));
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'loans'));
+
+    const unsubInst = onSnapshot(collection(db, 'installments'), (snap) => {
+      setInstallments(snap.docs.map(d => ({ ...d.data(), id: d.id } as Installment)));
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'installments'));
+
+    const unsubInv = onSnapshot(collection(db, 'investments'), (snap) => {
+      setInvestments(snap.docs.map(d => ({ ...d.data(), id: d.id } as Investment)));
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'investments'));
+
+    const unsubExp = onSnapshot(collection(db, 'expenses'), (snap) => {
+      setExpenses(snap.docs.map(d => ({ ...d.data(), id: d.id } as Expense)));
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'expenses'));
+
+    const unsubCash = onSnapshot(collection(db, 'cash_entries'), (snap) => {
+      setCashEntries(snap.docs.map(d => ({ ...d.data(), id: d.id } as CashEntry)));
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'cash_entries'));
+
     return () => {
-      unsubDeps(); unsubMem(); unsubSettings();
+      unsubDeps(); unsubMem(); unsubSettings(); unsubLoans(); unsubInst(); unsubInv(); unsubExp(); unsubCash();
     };
   }, []);
 
   const fmt = (num: number) => Math.round(num).toLocaleString('en-IN');
+  const n = (v: any) => Number(v) || 0;
   const mn = ['জানু', 'ফেব', 'মার্চ', 'এপ্রি', 'মে', 'জুন', 'জুলা', 'আগ', 'সেপ্টে', 'অক্টো', 'নভে', 'ডিসে'];
   const months = Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, '0')}`);
 
   const years = [...new Set(deposits.filter(d => d.month).map(d => d.month.slice(0, 4)))].sort().reverse();
   if (years.length === 0) years.push(new Date().getFullYear().toString());
 
+  // Calculations
+  const totalDeposits = deposits.reduce((s, d) => s + Number(d.amount), 0);
+  const totalLoansDisbursed = loans.reduce((s, l) => s + Number(l.amount), 0);
+  const totalInstallments = installments.reduce((s, i) => s + Number(i.amount), 0);
+  const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount), 0);
+  const totalInvestmentsOut = investments.reduce((s, i) => s + Number(i.amount), 0);
+  const totalInvestmentReturns = investments.filter(i => i.status === 'received').reduce((s, i) => s + Number(i.received_amount || 0), 0);
+  const totalCashAdded = cashEntries.reduce((s, e) => e.type === 'out' ? s - Number(e.amount) : s + Number(e.amount), 0);
+
+  const currentCash = totalDeposits + totalInstallments + totalInvestmentReturns + totalCashAdded - totalLoansDisbursed - totalExpenses - totalInvestmentsOut;
+  const totalLoanProfit = installments.reduce((s, i) => s + Number(i.interest || 0), 0);
+  const totalInvestmentProfit = investments.filter(i => i.status === 'received').reduce((s, i) => s + (Number(i.received_amount || 0) - Number(i.amount)), 0);
+  const totalProfit = totalLoanProfit + totalInvestmentProfit;
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-10">
       <h3 className="font-serif text-base font-bold flex items-center gap-2">
-        📊 রিপোর্ট
+        📊 রিপোর্ট ও পরিসংখ্যান
       </h3>
+
+      {/* Summary Section */}
+      <div className="grid grid-cols-2 gap-3">
+        <Card className="bg-linear-to-br from-primary-dark to-primary text-white p-3">
+          <div className="flex justify-between items-start mb-2">
+            <div className="p-1.5 bg-white/20 rounded-lg"><Wallet className="w-4 h-4" /></div>
+            <div className="text-[10px] font-bold opacity-80">ফান্ড ব্যালেন্স</div>
+          </div>
+          <div className="text-lg font-black">৳{fmt(currentCash)}</div>
+          <div className="text-[9px] mt-1 opacity-70">বর্তমানে হাতে আছে</div>
+        </Card>
+
+        <Card className="bg-linear-to-br from-green-600 to-green-500 text-white p-3">
+          <div className="flex justify-between items-start mb-2">
+            <div className="p-1.5 bg-white/20 rounded-lg"><TrendingUp className="w-4 h-4" /></div>
+            <div className="text-[10px] font-bold opacity-80">মোট লাভ</div>
+          </div>
+          <div className="text-lg font-black">৳{fmt(totalProfit)}</div>
+          <div className="text-[9px] mt-1 opacity-70">বিনিয়োগ ও ঋণ থেকে</div>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-3">
+          <div className="bg-white p-3 rounded-2xl border border-app-border shadow-xs">
+            <div className="flex items-center gap-2 mb-1">
+              <ArrowUpRight className="w-3 h-3 text-green-600" />
+              <span className="text-[10px] font-bold text-app-text-secondary">মোট জমা</span>
+            </div>
+            <div className="text-sm font-black">৳{fmt(totalDeposits)}</div>
+          </div>
+          <div className="bg-white p-3 rounded-2xl border border-app-border shadow-xs">
+            <div className="flex items-center gap-2 mb-1">
+              <ArrowDownRight className="w-3 h-3 text-danger" />
+              <span className="text-[10px] font-bold text-app-text-secondary">মোট খরচ</span>
+            </div>
+            <div className="text-sm font-black">৳{fmt(totalExpenses)}</div>
+          </div>
+        </div>
+        <div className="space-y-3">
+          <div className="bg-white p-3 rounded-2xl border border-app-border shadow-xs">
+            <div className="flex items-center gap-2 mb-1">
+              <Banknote className="w-3 h-3 text-orange-600" />
+              <span className="text-[10px] font-bold text-app-text-secondary">ঋণ বিতরণ</span>
+            </div>
+            <div className="text-sm font-black">৳{fmt(totalLoansDisbursed)}</div>
+          </div>
+          <div className="bg-white p-3 rounded-2xl border border-app-border shadow-xs">
+            <div className="flex items-center gap-2 mb-1">
+              <PieChart className="w-3 h-3 text-blue-600" />
+              <span className="text-[10px] font-bold text-app-text-secondary">বিনিয়োগ</span>
+            </div>
+            <div className="text-sm font-black">৳{fmt(totalInvestmentsOut)}</div>
+          </div>
+        </div>
+      </div>
 
       {/* Excel Sheet Embed */}
       <Card className="p-0 overflow-hidden">
@@ -75,6 +170,52 @@ export const Reports: React.FC = () => {
               <div className="text-xs">সেটিংস থেকে লিংক যোগ করুন</div>
             </div>
           )}
+        </div>
+      </Card>
+
+      {/* Monthly Summary Table */}
+      <Card className="p-0 overflow-hidden">
+        <div className="p-3 px-4 bg-linear-to-br from-indigo-600 to-indigo-400 text-white">
+          <div className="text-sm font-bold flex items-center gap-2">
+            <PieChart className="w-4 h-4" /> মাসিক সারসংক্ষেপ ({year})
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-[10px]">
+            <thead>
+              <tr className="bg-app-bg-secondary border-b border-app-border">
+                <th className="p-2 text-left">মাস</th>
+                <th className="p-2 text-right">জমা</th>
+                <th className="p-2 text-right">ঋণ</th>
+                <th className="p-2 text-right">খরচ</th>
+                <th className="p-2 text-right">লাভ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {months.map((mo, i) => {
+                const mDeps = deposits.filter(d => d.month === mo).reduce((s, d) => s + n(d.amount), 0);
+                const mLoans = loans.filter(l => l.date.startsWith(mo)).reduce((s, l) => s + n(l.amount), 0);
+                const mExps = expenses.filter(e => e.date.startsWith(mo)).reduce((s, e) => s + n(e.amount), 0);
+                const mInstProfit = installments.filter(inst => inst.date.startsWith(mo)).reduce((s, inst) => {
+                  const l = loans.find(ln => ln.id === inst.loan_id);
+                  if (!l || !l.total_payable || !l.total_interest) return s;
+                  return s + n(inst.amount) * (n(l.total_interest) / n(l.total_payable));
+                }, 0);
+                
+                if (mDeps === 0 && mLoans === 0 && mExps === 0 && mInstProfit === 0) return null;
+
+                return (
+                  <tr key={mo} className="border-b border-app-border last:border-0">
+                    <td className="p-2 font-bold">{mn[i]}</td>
+                    <td className="p-2 text-right text-primary font-bold">৳{fmt(mDeps)}</td>
+                    <td className="p-2 text-right text-orange-600">৳{fmt(mLoans)}</td>
+                    <td className="p-2 text-right text-danger">৳{fmt(mExps)}</td>
+                    <td className="p-2 text-right text-green-600 font-bold">৳{fmt(mInstProfit)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </Card>
 
@@ -175,6 +316,62 @@ export const Reports: React.FC = () => {
                 </tbody>
               </table>
             </div>
+          )}
+        </div>
+      </Card>
+
+      {/* Loan Report */}
+      <Card className="p-0 overflow-hidden">
+        <div className="p-3 px-4 bg-linear-to-br from-orange-600 to-orange-400 text-white flex items-center justify-between">
+          <div className="text-sm font-bold flex items-center gap-2">
+            <Banknote className="w-4 h-4" /> ঋণ রিপোর্ট ও রিকভারি
+          </div>
+          <div className="text-[10px] font-bold bg-white/20 px-2 py-1 rounded-md">
+            মোট ঋণ: ৳{fmt(totalLoansDisbursed)}
+          </div>
+        </div>
+        <div className="p-2 space-y-2">
+          {loans.length === 0 ? (
+            <div className="text-center py-6 text-app-text-muted italic text-sm">কোনো ঋণ নেই</div>
+          ) : (
+            loans.map(l => {
+              const member = members.find(m => m.id === l.member_id);
+              const paid = installments.filter(i => i.loan_id === l.id).reduce((s, i) => s + Number(i.amount), 0);
+              const remaining = Number(l.total_payable) - paid;
+              const progress = (paid / Number(l.total_payable)) * 100;
+              
+              return (
+                <div key={l.id} className="bg-app-bg-secondary rounded-xl p-3 border border-app-border/50">
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-[10px] font-bold">
+                        {member?.name[0].toUpperCase() || '?'}
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold">{member?.name || 'অজানা সদস্য'}</div>
+                        <div className="text-[9px] text-app-text-muted">📅 {l.date}</div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs font-black text-orange-600">৳{fmt(remaining)} বাকি</div>
+                      <div className="text-[9px] text-app-text-muted">মোট: ৳{fmt(l.total_payable)}</div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-between text-[9px] mb-1 font-bold">
+                    <span className="text-green-600">পরিশোধ: ৳{fmt(paid)}</span>
+                    <span className="text-app-text-muted">{Math.round(progress)}% সম্পন্ন</span>
+                  </div>
+                  
+                  <div className="h-1.5 w-full bg-orange-100 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-orange-500 transition-all duration-500" 
+                      style={{ width: `${Math.min(100, progress)}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })
           )}
         </div>
       </Card>

@@ -10,6 +10,12 @@ export interface User {
   address?: string;
   join_date?: string;
   pin_hash?: string;
+  father_name?: string;
+  mother_name?: string;
+  nid?: string;
+  occupation?: string;
+  nominee_name?: string;
+  nominee_relation?: string;
 }
 
 export interface Member extends User {}
@@ -83,6 +89,7 @@ export interface CashEntry {
   id: string;
   title: string;
   amount: number;
+  type: 'in' | 'out';
   date: string;
   note?: string | null;
   distributed: boolean;

@@ -1,92 +1,146 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-    
+
     // ===============================================================
     // Helper Functions
     // ===============================================================
-    
+
     function isAuthenticated() {
       return request.auth != null;
     }
-    
-    function isAdmin() {
-      return isAuthenticated() && (
-        // Super Admin by Email
-        (request.auth.token.email == "sujonali9091@gmail.com" && request.auth.token.email_verified == true) ||
-        // Admin by linked Firebase UID (if we implement linking)
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
-      );
-    }
-    
+
     function isOwner(userId) {
-      return isAuthenticated() && (request.auth.uid == userId || exists(/databases/$(database)/documents/members/$(userId)));
+      return isAuthenticated() && request.auth.uid == userId;
     }
 
-    function isDocOwner() {
-      return isAuthenticated() && (request.auth.uid == resource.data.member_id || resource.data.member_id == 'SUPER');
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "sujonali9091@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isMember() {
+      return isAuthenticated() && exists(/databases/$(database)/documents/members/$(request.auth.uid));
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasRequiredFields(['name', 'phone', 'role']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.phone is string && data.phone.size() >= 11 && data.phone.size() <= 15 &&
+             data.role in ['admin', 'member'];
+    }
+
+    function isValidDeposit(data) {
+      return hasRequiredFields(['month', 'amount', 'date', 'fine']) &&
+             data.month is string && data.month.matches("^\\d{4}-\\d{2}$") &&
+             data.amount is number && data.amount >= 0 &&
+             data.date is string &&
+             data.fine is bool;
+    }
+
+    function isValidLoan(data) {
+      return hasRequiredFields(['member_id', 'amount', 'interest', 'installments', 'date', 'total_interest', 'total_payable', 'monthly_installment', 'status']) &&
+             data.member_id is string &&
+             data.amount is number && data.amount > 0 &&
+             data.interest is number && data.interest >= 0 &&
+             data.installments is int && data.installments > 0 &&
+             data.status in ['active', 'completed'];
+    }
+
+    function isValidRequest(data) {
+      return hasRequiredFields(['type', 'member_id', 'data', 'status', 'created_at']) &&
+             data.type in ['deposit', 'loan', 'installment'] &&
+             data.status in ['pending', 'approved', 'rejected'];
     }
 
     // ===============================================================
     // Rules
     // ===============================================================
 
-    match /settings/main {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
+    // Admins collection
     match /admins/{adminId} {
       allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow create, update: if isAdmin() && isValidUser(request.resource.data);
+      allow delete: if isAdmin();
     }
 
+    // Members collection
     match /members/{memberId} {
       allow read: if isAuthenticated();
-      allow create: if isAdmin();
-      allow update: if isAdmin() || (isAuthenticated() && (resource.data.firebase_uid == request.auth.uid || memberId == request.auth.uid));
+      allow create, update: if isAdmin() && isValidUser(request.resource.data);
       allow delete: if isAdmin();
     }
 
+    // Pending registrations
     match /pending_regs/{regId} {
-      allow read: if isAuthenticated(); // Allow check during login
-      allow create: if true; // Public registration
+      allow read: if isAdmin() || isOwner(regId);
+      allow create: if isAuthenticated() && isValidUser(request.resource.data);
+      allow update: if isAdmin() || (isOwner(regId) && isValidUser(request.resource.data));
       allow delete: if isAdmin();
     }
 
-    match /deposits/{depId} {
+    // Deposits
+    match /deposits/{depositId} {
       allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow create: if isAdmin() && isValidDeposit(request.resource.data);
+      allow update: if isAdmin() && isValidDeposit(request.resource.data);
+      allow delete: if isAdmin();
     }
 
+    // Loans
     match /loans/{loanId} {
       allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow create: if isAdmin() && isValidLoan(request.resource.data);
+      allow update: if isAdmin() && isValidLoan(request.resource.data);
+      allow delete: if isAdmin();
     }
 
+    // Installments
     match /installments/{instId} {
       allow read: if isAuthenticated();
-      allow write: if isAdmin();
-    }
-
-    match /requests/{reqId} {
-      allow read: if isAuthenticated(); // Simplified for now to avoid UID mismatch
-      allow create: if isAuthenticated();
+      allow create: if isAdmin();
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
+    // Requests
+    match /requests/{requestId} {
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.member_id == request.auth.uid);
+      allow create: if isAuthenticated() && isValidRequest(request.resource.data) && request.resource.data.member_id == request.auth.uid;
+      allow update: if isAdmin() || (isAuthenticated() && resource.data.member_id == request.auth.uid && request.resource.data.status == 'pending');
+      allow delete: if isAdmin();
+    }
+
+    // Investments
     match /investments/{invId} {
       allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow create, update, delete: if isAdmin();
     }
 
+    // Expenses
     match /expenses/{expId} {
       allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow create, update, delete: if isAdmin();
     }
 
+    // Notifications
     match /notifications/{notifId} {
       allow read: if isAuthenticated();
       allow create: if isAdmin();
@@ -94,27 +148,20 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    match /terms/main {
-      allow read: if true;
+    // Settings
+    match /settings/{settingId} {
+      allow read: if isAuthenticated();
       allow write: if isAdmin();
     }
 
-    match /developer/main {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
+    // Terms, Developer, Contacts, Cash Entries
+    match /terms/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /developer/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /contacts/{id} { allow read: if isAuthenticated(); allow write: if isAdmin(); }
+    match /cash_entries/{id} { allow read: if isAuthenticated(); allow write: if isAdmin(); }
 
-    match /contacts/{contactId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    match /cash_entries/{entryId} {
-      allow read: if isAdmin();
-      allow write: if isAdmin();
-    }
-    
-    match /{path=**} {
+    // Default deny
+    match /{document=**} {
       allow read, write: if false;
     }
   }

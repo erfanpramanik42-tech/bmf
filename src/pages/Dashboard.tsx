@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
-import { Deposit, Loan, Installment, Investment, Expense, User } from '../types';
+import { collection, onSnapshot, query, orderBy, where } from 'firebase/firestore';
+import { Deposit, Loan, Installment, Investment, Expense, User, CashEntry } from '../types';
 import { Card } from '../components/Card';
 import { cn } from '../lib/utils';
 
@@ -18,7 +18,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentUser, onAction }) =
   const [installments, setInstallments] = useState<Installment[]>([]);
   const [investments, setInvestments] = useState<Investment[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [cashEntries, setCashEntries] = useState<CashEntry[]>([]);
   const [membersCount, setMembersCount] = useState(0);
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
+  const [activeTab, setActiveTab] = useState<'all' | 'deposit' | 'loan' | 'investment' | 'expense'>('all');
 
   useEffect(() => {
     const unsubDeps = onSnapshot(collection(db, 'deposits'), (snap) => {
@@ -41,12 +44,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentUser, onAction }) =
       setExpenses(snap.docs.map(d => ({ ...d.data(), id: d.id } as Expense)));
     }, (error) => handleFirestoreError(error, OperationType.GET, 'expenses'));
 
+    const unsubCash = onSnapshot(collection(db, 'cash_entries'), (snap) => {
+      setCashEntries(snap.docs.map(d => ({ ...d.data(), id: d.id } as CashEntry)));
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'cash_entries'));
+
     const unsubMem = onSnapshot(collection(db, 'members'), (snap) => {
       setMembersCount(snap.size);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'members'));
 
+    const unsubReqs = onSnapshot(query(collection(db, 'requests'), where('status', '==', 'pending')), (snap) => {
+      setPendingRequestsCount(snap.size);
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'requests'));
+
     return () => {
-      unsubDeps(); unsubLoans(); unsubInst(); unsubInv(); unsubExp(); unsubMem();
+      unsubDeps(); unsubLoans(); unsubInst(); unsubInv(); unsubExp(); unsubMem(); unsubCash(); unsubReqs();
     };
   }, []);
 
@@ -60,8 +71,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentUser, onAction }) =
   const totalReceivedProfit = investments.filter(i => i.status === 'received')
     .reduce((s, i) => s + n(i.received_amount) - n(i.amount), 0);
   const totalExpenses = expenses.reduce((s, e) => s + n(e.amount), 0);
+  const totalCashAdded = cashEntries.reduce((s, e) => s + (e.type === 'in' ? n(e.amount) : -n(e.amount)), 0);
 
-  const totalFund = totalDeposits + totalInstPaid + totalReceivedProfit - totalLoanGiven - totalActiveInv - totalExpenses;
+  const totalFund = totalDeposits + totalInstPaid + totalReceivedProfit + totalCashAdded - totalLoanGiven - totalActiveInv - totalExpenses;
 
   const activeLoans = loans.filter(l => l.status === 'active');
   const activeLoanPrincipalTotal = activeLoans.reduce((s, l) => s + n(l.amount), 0);
@@ -74,6 +86,35 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentUser, onAction }) =
   }, 0);
 
   const totalFine = deposits.filter(d => d.fine).reduce((s, d) => s + n(d.amount), 0);
+
+  // Combine all transactions for the recent list
+  const allTransactions = [
+    ...deposits.map(d => ({ id: d.id, title: 'জমা', amount: d.amount, date: d.date, type: 'in' as const, category: 'deposit' })),
+    ...installments.map(i => ({ id: i.id, title: 'কিস্তি', amount: i.amount, date: i.date, type: 'in' as const, category: 'deposit' })),
+    ...loans.map(l => ({ id: l.id, title: 'ঋণ প্রদান', amount: l.amount, date: l.date, type: 'out' as const, category: 'loan' })),
+    ...expenses.map(e => ({ id: e.id, title: e.title, amount: e.amount, date: e.date, type: 'out' as const, category: 'expense' })),
+    ...cashEntries.map(c => ({ id: c.id, title: c.title, amount: c.amount, date: c.date, type: c.type, category: 'expense' })),
+    ...investments.filter(i => i.status === 'received').map(i => ({ 
+      id: i.id, 
+      title: `বিনিয়োগ ফেরত: ${i.title}`, 
+      amount: i.received_amount || 0, 
+      date: i.received_date || i.invest_date, 
+      type: 'in' as const,
+      category: 'investment'
+    })),
+    ...investments.filter(i => i.status === 'active').map(i => ({ 
+      id: i.id, 
+      title: `বিনিয়োগ: ${i.title}`, 
+      amount: i.amount, 
+      date: i.invest_date, 
+      type: 'out' as const,
+      category: 'investment'
+    }))
+  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  const filteredTransactions = activeTab === 'all' 
+    ? allTransactions.slice(0, 15) 
+    : allTransactions.filter(tx => tx.category === activeTab).slice(0, 15);
 
   return (
     <div className="space-y-4">
@@ -130,6 +171,55 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentUser, onAction }) =
         )}
       </div>
 
+      {currentUser.role === 'admin' && pendingRequestsCount > 0 && (
+        <Card className="bg-accent/10 border-accent/20 p-4 flex items-center justify-between animate-pulse">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-accent text-white flex items-center justify-center text-xl shadow-lg">
+              🔔
+            </div>
+            <div>
+              <div className="text-sm font-bold text-accent">{pendingRequestsCount}টি নতুন অনুরোধ</div>
+              <div className="text-[10px] text-app-text-muted">অনুমোদনের জন্য অপেক্ষা করছে</div>
+            </div>
+          </div>
+          <button 
+            onClick={() => onAction('goto_requests')}
+            className="px-4 py-2 bg-accent text-white rounded-full text-[10px] font-bold shadow-md active:scale-95 transition-all"
+          >
+            দেখুন
+          </button>
+        </Card>
+      )}
+
+      {/* Active Investments Section */}
+      {investments.filter(i => i.status === 'active').length > 0 && (
+        <div className="space-y-2.5">
+          <h3 className="font-serif text-base font-bold flex items-center gap-2">
+            📈 চলমান বিনিয়োগ
+          </h3>
+          <div className="space-y-2">
+            {investments.filter(i => i.status === 'active').map(inv => (
+              <Card key={inv.id} className="p-3 bg-linear-to-br from-blue-50 to-white border-blue-100">
+                <div className="flex justify-between items-start mb-2">
+                  <div>
+                    <div className="text-xs font-bold text-blue-900">{inv.title}</div>
+                    <div className="text-[10px] text-app-text-muted">📅 {inv.invest_date}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-black text-blue-600">৳{fmt(inv.amount)}</div>
+                    <div className="text-[9px] text-app-text-muted">বিনিয়োগকৃত</div>
+                  </div>
+                </div>
+                <div className="flex justify-between items-center pt-2 border-t border-blue-100/50">
+                  <div className="text-[10px] text-app-text-muted">সম্ভাব্য লাভ: <span className="text-green-600 font-bold">৳{fmt(inv.expected_return)}</span></div>
+                  <div className="text-[9px] px-2 py-0.5 bg-blue-100 text-blue-600 rounded-full font-bold uppercase tracking-wider">চলমান</div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-2.5">
         <StatCard icon="👥" value={membersCount} label="মোট সদস্য" color="primary" />
         <StatCard icon="💰" value={`৳${fmt(totalDeposits)}`} label="মোট জমা" color="accent" />
@@ -138,14 +228,64 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentUser, onAction }) =
       </div>
 
       <div className="space-y-3">
-        <h3 className="font-serif text-base font-bold flex items-center gap-2">
-          🕐 সাম্প্রতিক লেনদেন
-        </h3>
+        <div className="flex items-center justify-between">
+          <h3 className="font-serif text-base font-bold flex items-center gap-2">
+            🕐 সাম্প্রতিক লেনদেন
+          </h3>
+        </div>
+
+        <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+          {[
+            { id: 'all', label: 'সব' },
+            { id: 'deposit', label: 'জমা' },
+            { id: 'loan', label: 'ঋণ' },
+            { id: 'investment', label: 'বিনিয়োগ' },
+            { id: 'expense', label: 'খরচ' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={cn(
+                "px-3 py-1.5 rounded-full text-[10px] font-bold whitespace-nowrap transition-all border",
+                activeTab === tab.id 
+                  ? "bg-primary text-white border-primary shadow-md" 
+                  : "bg-white text-app-text-muted border-app-border"
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
         <div className="space-y-2">
-          {/* Recent transactions list would go here */}
-          <div className="text-center py-8 text-app-text-muted text-sm italic">
-            লেনদেন লোড হচ্ছে...
-          </div>
+          {filteredTransactions.length === 0 ? (
+            <div className="text-center py-8 text-app-text-muted text-sm italic bg-app-card rounded-xl border border-dashed border-app-border">
+              এই ক্যাটাগরিতে কোনো লেনদেন পাওয়া যায়নি
+            </div>
+          ) : (
+            filteredTransactions.map((tx, idx) => (
+              <div key={`${tx.id}-${idx}`} className="flex items-center justify-between p-3 bg-app-card rounded-xl border border-app-border shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className={cn(
+                    "w-8 h-8 rounded-full flex items-center justify-center text-sm",
+                    tx.type === 'in' ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"
+                  )}>
+                    {tx.type === 'in' ? '↓' : '↑'}
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-app-text-primary">{tx.title}</div>
+                    <div className="text-[9px] text-app-text-muted">{tx.date}</div>
+                  </div>
+                </div>
+                <div className={cn(
+                  "text-xs font-black",
+                  tx.type === 'in' ? "text-green-600" : "text-red-600"
+                )}>
+                  {tx.type === 'in' ? '+' : '-'} ৳{fmt(tx.amount)}
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>
