@@ -1,0 +1,5 @@
+{
+  "name": "বন্ধুমহল ফাউন্ডেশন",
+  "description": "আপনার বন্ধুদের সঞ্চয় তহবিল ব্যবস্থাপনা অ্যাপ।",
+  "requestFramePermissions": ["camera"]
+}

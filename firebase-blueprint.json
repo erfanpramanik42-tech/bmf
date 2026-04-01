@@ -1,0 +1,162 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "System user (admin or member)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "member"] },
+        "isSuperAdmin": { "type": "boolean" },
+        "photo": { "type": "string" },
+        "address": { "type": "string" },
+        "join_date": { "type": "string" },
+        "pin_hash": { "type": "string" }
+      },
+      "required": ["id", "name", "phone", "role", "pin_hash"]
+    },
+    "Deposit": {
+      "title": "Deposit",
+      "description": "Monthly deposit record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "member_id": { "type": "string" },
+        "month": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string" },
+        "note": { "type": "string" },
+        "fine": { "type": "boolean" }
+      },
+      "required": ["id", "month", "amount", "date", "fine"]
+    },
+    "Loan": {
+      "title": "Loan",
+      "description": "Loan record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "member_id": { "type": "string" },
+        "amount": { "type": "number" },
+        "interest": { "type": "number" },
+        "installments": { "type": "integer" },
+        "date": { "type": "string" },
+        "purpose": { "type": "string" },
+        "total_interest": { "type": "number" },
+        "total_payable": { "type": "number" },
+        "monthly_installment": { "type": "number" },
+        "status": { "type": "string", "enum": ["active", "completed"] }
+      },
+      "required": ["id", "member_id", "amount", "interest", "installments", "date", "total_interest", "total_payable", "monthly_installment", "status"]
+    },
+    "Installment": {
+      "title": "Installment",
+      "description": "Loan installment payment",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "member_id": { "type": "string" },
+        "loan_id": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string" },
+        "note": { "type": "string" }
+      },
+      "required": ["id", "member_id", "loan_id", "amount", "date"]
+    },
+    "Request": {
+      "title": "Request",
+      "description": "Member request for deposit, loan or installment",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string", "enum": ["deposit", "loan", "installment"] },
+        "member_id": { "type": "string" },
+        "data": { "type": "object" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "created_at": { "type": "string" },
+        "approved_at": { "type": "string" },
+        "approved_by": { "type": "string" }
+      },
+      "required": ["id", "type", "member_id", "data", "status", "created_at"]
+    },
+    "Investment": {
+      "title": "Investment",
+      "description": "Fund investment record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "amount": { "type": "number" },
+        "expected_return": { "type": "number" },
+        "profit": { "type": "number" },
+        "invest_date": { "type": "string" },
+        "maturity_date": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "received"] },
+        "received_amount": { "type": "number" },
+        "received_date": { "type": "string" }
+      },
+      "required": ["id", "title", "amount", "expected_return", "profit", "invest_date", "status"]
+    },
+    "Expense": {
+      "title": "Expense",
+      "description": "Fund expense record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string" },
+        "note": { "type": "string" }
+      },
+      "required": ["id", "title", "amount", "date"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "System notification",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "target": { "type": "string" },
+        "sent_at": { "type": "string" },
+        "sent_by": { "type": "string" },
+        "read_by": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["id", "title", "body", "target", "sent_at", "sent_by", "read_by"]
+    },
+    "AppSettings": {
+      "title": "AppSettings",
+      "description": "Global application settings",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "monthly_deposit": { "type": "number" },
+        "interest_rate": { "type": "number" },
+        "excel_link": { "type": "string" },
+        "super_admin_phone": { "type": "string" },
+        "super_admin_pin_hash": { "type": "string" }
+      },
+      "required": ["id", "monthly_deposit", "interest_rate", "super_admin_pin_hash"]
+    }
+  },
+  "firestore": {
+    "admins": { "schema": "User", "description": "Admin users" },
+    "members": { "schema": "User", "description": "Foundation members" },
+    "pending_regs": { "schema": "User", "description": "Pending registrations" },
+    "deposits": { "schema": "Deposit", "description": "Deposit records" },
+    "loans": { "schema": "Loan", "description": "Loan records" },
+    "installments": { "schema": "Installment", "description": "Installment payments" },
+    "requests": { "schema": "Request", "description": "Member requests" },
+    "investments": { "schema": "Investment", "description": "Fund investments" },
+    "expenses": { "schema": "Expense", "description": "Fund expenses" },
+    "notifications": { "schema": "Notification", "description": "System notifications" },
+    "settings": { "schema": "AppSettings", "description": "App settings" },
+    "terms": { "schema": "object", "description": "Foundation terms" },
+    "developer": { "schema": "object", "description": "Developer info" },
+    "contacts": { "schema": "object", "description": "Contact persons" },
+    "cash_entries": { "schema": "object", "description": "Cash fund entries" }
+  }
+}
