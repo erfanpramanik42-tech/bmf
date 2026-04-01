@@ -1,0 +1,52 @@
+@import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&family=Noto+Serif+Bengali:wght@400;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Hind Siliguri", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Noto Serif Bengali", ui-serif, Georgia, serif;
+
+  --color-primary: #1a6b3c;
+  --color-primary-light: #2d9657;
+  --color-primary-dark: #0f4025;
+  --color-accent: #f0a500;
+  --color-danger: #e63946;
+  --color-warning: #f4a261;
+  
+  --color-app-bg: #f0f4f1;
+  --color-app-bg-secondary: #e4ede7;
+  --color-app-card: #ffffff;
+  
+  --color-app-text: #1a2e22;
+  --color-app-text-secondary: #4a6558;
+  --color-app-text-muted: #8aaa96;
+  
+  --color-app-border: #d0e0d6;
+
+  --radius-app: 18px;
+  --radius-app-sm: 10px;
+  
+  --shadow-app: 0 4px 20px rgba(26, 107, 60, 0.10);
+}
+
+@layer base {
+  body {
+    @apply bg-app-bg text-app-text font-sans;
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: 100vh;
+    box-shadow: 0 0 60px rgba(0,0,0,.08);
+    position: relative;
+    overflow-x: hidden;
+  }
+}
+
+.dark {
+  --color-app-bg: #0e1a13;
+  --color-app-bg-secondary: #162010;
+  --color-app-card: #1a2e1e;
+  --color-app-text: #e8f5ee;
+  --color-app-text-secondary: #a8c4b0;
+  --color-app-text-muted: #5a7a62;
+  --color-app-border: #2a4030;
+  --shadow-app: 0 4px 20px rgba(0,0,0,.35);
+}
