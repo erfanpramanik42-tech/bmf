@@ -50,6 +50,13 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
     try {
       const date = new Date().toISOString().split('T')[0];
       if (req.type === 'deposit') {
+        // Prevent future month deposits
+        const currentMonth = new Date().toISOString().slice(0, 7);
+        if (req.data.month > currentMonth) {
+          showToast('⚠️ আপনি আগামী মাসের জমা নিতে পারবেন না');
+          return;
+        }
+
         // Double check if deposit already exists for this month
         const depQuery = query(
           collection(db, 'deposits'), 
@@ -334,14 +341,14 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
           </>
         ) : (
           <div className="space-y-3">
-            {notifications.filter(n => n.target === 'all' || n.target === currentUser.id).length === 0 ? (
+            {notifications.filter(n => n.target === 'all' || n.target === currentUser.id || n.target === currentUser.phone).length === 0 ? (
               <div className="text-center py-10">
                 <div className="text-4xl mb-2 opacity-30">📭</div>
                 <p className="text-xs text-app-text-muted italic">কোনো নোটিফিকেশন নেই</p>
               </div>
             ) : (
               notifications
-                .filter(n => n.target === 'all' || n.target === currentUser.id)
+                .filter(n => n.target === 'all' || n.target === currentUser.id || n.target === currentUser.phone)
                 .map(notif => {
                   const isRead = notif.read_by?.includes(currentUser.id);
                   return (

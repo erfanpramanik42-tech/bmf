@@ -229,26 +229,43 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentUser, onAction }) =
 
       {/* Active Investments Section */}
       {investments.filter(i => i.status === 'active').length > 0 && (
-        <div className="space-y-2.5">
-          <h3 className="font-serif text-base font-bold flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-primary" /> চলমান বিনিয়োগ
+        <div className="space-y-2">
+          <h3 className="font-serif text-sm font-bold flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-primary" /> চলমান বিনিয়োগ
           </h3>
           <div className="space-y-2">
             {investments.filter(i => i.status === 'active').map(inv => (
-              <Card key={inv.id} className="p-3 bg-linear-to-br from-blue-50 to-white border-blue-100">
+              <Card key={inv.id} className="p-3 bg-linear-to-br from-blue-50 to-white border-blue-100 shadow-sm">
                 <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <div className="text-xs font-bold text-blue-900">{inv.title}</div>
-                    <div className="text-[10px] text-app-text-muted">📅 {inv.invest_date}</div>
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600">
+                      <BarChart3 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="text-[13px] font-bold text-blue-900">{inv.title}</div>
+                      <div className="text-[9px] text-app-text-muted flex items-center gap-1">
+                        <Clock className="w-2.5 h-2.5" /> {inv.invest_date}
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-sm font-black text-blue-600">৳{fmt(inv.amount)}</div>
-                    <div className="text-[9px] text-app-text-muted">বিনিয়োগকৃত</div>
+                  <div className="px-1.5 py-0.5 bg-blue-100 text-blue-600 rounded text-[7px] font-bold uppercase tracking-wider">
+                    চলমান
                   </div>
                 </div>
-                <div className="flex justify-between items-center pt-2 border-t border-blue-100/50">
-                  <div className="text-[10px] text-app-text-muted">সম্ভাব্য লাভ: <span className="text-green-600 font-bold">৳{fmt(inv.expected_return)}</span></div>
-                  <div className="text-[9px] px-2 py-0.5 bg-blue-100 text-blue-600 rounded-full font-bold uppercase tracking-wider">চলমান</div>
+
+                <div className="grid grid-cols-3 gap-1.5 py-2 border-y border-blue-100/50">
+                  <div className="text-center border-r border-blue-100/50">
+                    <div className="text-[7px] text-app-text-muted font-bold uppercase mb-0.5">বিনিয়োগ</div>
+                    <div className="text-[11px] font-bold text-app-text-primary">৳{fmt(inv.amount)}</div>
+                  </div>
+                  <div className="text-center border-r border-blue-100/50">
+                    <div className="text-[7px] text-green-600 font-bold uppercase mb-0.5">লাভ</div>
+                    <div className="text-[11px] font-bold text-green-700">৳{fmt(inv.profit)}</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-[7px] text-blue-600 font-bold uppercase mb-0.5">মোট পাবো</div>
+                    <div className="text-[11px] font-bold text-blue-600">৳{fmt(n(inv.amount) + n(inv.profit))}</div>
+                  </div>
                 </div>
               </Card>
             ))}

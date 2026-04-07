@@ -13,6 +13,7 @@
         "photo": { "type": "string" },
         "address": { "type": "string" },
         "join_date": { "type": "string" },
+        "birthday": { "type": "string" },
         "pin_hash": { "type": "string" }
       },
       "required": ["id", "name", "phone", "role", "pin_hash"]
@@ -140,9 +141,76 @@
         "super_admin_pin_hash": { "type": "string" }
       },
       "required": ["id", "monthly_deposit", "interest_rate", "super_admin_pin_hash"]
+    },
+    "Terms": {
+      "title": "Terms",
+      "description": "Foundation terms and conditions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "membership": { "type": "array", "items": { "type": "string" } },
+        "deposit": { "type": "array", "items": { "type": "string" } },
+        "loan": { "type": "array", "items": { "type": "string" } },
+        "governance": { "type": "array", "items": { "type": "string" } },
+        "special": { "type": "string" },
+        "updated_at": { "type": "string" },
+        "updated_by": { "type": "string" }
+      },
+      "required": ["id"]
+    },
+    "DeveloperInfo": {
+      "title": "Developer Info",
+      "description": "Information about the application developer",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "address": { "type": "string" },
+        "phone": { "type": "string" },
+        "facebook": { "type": "string" },
+        "photo": { "type": "string" },
+        "bio": { "type": "string" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "phone"]
+    },
+    "Contact": {
+      "title": "Contact",
+      "description": "Fund official / Person in charge",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "position": { "type": "string" },
+        "phone": { "type": "string" },
+        "address": { "type": "string" },
+        "photo": { "type": "string" },
+        "bkash": { "type": "string" },
+        "nagad": { "type": "string" },
+        "created_at": { "type": "string" }
+      },
+      "required": ["id", "name", "position", "phone"]
+    },
+    "Document": {
+      "title": "Document",
+      "description": "Foundation document or file link",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "url": { "type": "string" },
+        "type": { "type": "string", "enum": ["pdf", "image", "link", "other"] },
+        "created_at": { "type": "string" },
+        "created_by": { "type": "string" }
+      },
+      "required": ["id", "title", "url", "type", "created_at"]
     }
   },
   "firestore": {
+    "developer": {
+      "schema": { "$ref": "DeveloperInfo" },
+      "description": "Information about the developer"
+    },
     "admins": { "schema": "User", "description": "Admin users" },
     "members": { "schema": "User", "description": "Foundation members" },
     "pending_regs": { "schema": "User", "description": "Pending registrations" },
@@ -154,9 +222,10 @@
     "expenses": { "schema": "Expense", "description": "Fund expenses" },
     "notifications": { "schema": "Notification", "description": "System notifications" },
     "settings": { "schema": "AppSettings", "description": "App settings" },
-    "terms": { "schema": "object", "description": "Foundation terms" },
+    "terms": { "schema": "Terms", "description": "Foundation terms" },
     "developer": { "schema": "object", "description": "Developer info" },
-    "contacts": { "schema": "object", "description": "Contact persons" },
-    "cash_entries": { "schema": "object", "description": "Cash fund entries" }
+    "contacts": { "schema": "Contact", "description": "Contact persons / Officials" },
+    "cash_entries": { "schema": "object", "description": "Cash fund entries" },
+    "documents": { "schema": "Document", "description": "Foundation documents" }
   }
 }

@@ -50,3 +50,13 @@
   --color-app-border: #2a4030;
   --shadow-app: 0 4px 20px rgba(0,0,0,.35);
 }
+
+@layer utilities {
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}

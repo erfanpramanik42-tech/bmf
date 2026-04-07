@@ -10,6 +10,7 @@ export interface User {
   photo?: string;
   address?: string;
   join_date?: string;
+  birthday?: string;
   pin_hash?: string;
   father_name?: string;
   mother_name?: string;
@@ -96,6 +97,17 @@ export interface CashEntry {
   distributed: boolean;
 }
 
+export interface DeveloperInfo {
+  id: string;
+  name: string;
+  address: string;
+  phone: string;
+  facebook: string;
+  photo: string;
+  bio: string;
+  updated_at: string;
+}
+
 export interface Contact {
   id: string;
   name: string;
@@ -105,7 +117,7 @@ export interface Contact {
   photo?: string;
   bkash?: string;
   nagad?: string;
-  rocket?: string;
+  created_at?: string;
 }
 
 export interface Notification {
@@ -141,4 +153,13 @@ export interface Developer {
   phone?: string;
   facebook?: string;
   bio?: string;
+}
+
+export interface Document {
+  id: string;
+  title: string;
+  url: string;
+  type: "pdf" | "image" | "link" | "other";
+  created_at: string;
+  created_by: string;
 }

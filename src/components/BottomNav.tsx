@@ -2,7 +2,7 @@ import React from 'react';
 import { cn } from '../lib/utils';
 import { Home, Users, Wallet, Landmark, FileText, Settings, User } from 'lucide-react';
 
-export type Page = 'dashboard' | 'members' | 'deposits' | 'loans' | 'reports' | 'settings' | 'mypage' | 'requests';
+export type Page = 'dashboard' | 'members' | 'deposits' | 'loans' | 'reports' | 'settings' | 'mypage' | 'terms' | 'investments' | 'officials' | 'birthdays' | 'documents' | 'about';
 
 interface BottomNavProps {
   activePage: Page;
@@ -19,7 +19,6 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activePage, onPageChange, 
     { id: 'deposits', icon: Wallet, label: 'জমা' },
     { id: 'loans', icon: Landmark, label: 'ঋণ' },
     { id: 'reports', icon: FileText, label: 'রিপোর্ট' },
-    { id: 'requests', icon: FileText, label: 'অনুরোধ' },
     { id: 'settings', icon: Settings, label: 'সেটিং' },
   ] : [
     { id: 'dashboard', icon: Home, label: 'হোম' },

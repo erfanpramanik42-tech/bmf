@@ -106,7 +106,7 @@ export const Members: React.FC<MembersProps> = ({ currentUser, onMemberClick, on
                 className="flex items-center gap-3 p-3"
               >
                 <div className="w-11 h-11 rounded-full bg-linear-to-br from-primary-light to-accent flex items-center justify-center text-white font-bold text-lg overflow-hidden shrink-0">
-                  {m.photo ? <img src={m.photo} alt={m.name} className="w-full h-full object-cover" /> : m.name[0].toUpperCase()}
+                  {m.photo ? <img src={m.photo} alt={m.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : m.name[0].toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-bold truncate flex items-center gap-1.5">

@@ -16,8 +16,15 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() &&
-        (get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'admin' ||
-         (request.auth.token.email == "sujonali9091@gmail.com" && request.auth.token.email_verified == true));
+        (isSuperAdmin() || 
+         (exists(/databases/$(database)/documents/admins/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'admin'));
+    }
+
+    function isSuperAdmin() {
+      return isAuthenticated() && 
+        request.auth.token.email == "sujonali9091@gmail.com" && 
+        request.auth.token.email_verified == true;
     }
 
     function isMember() {
@@ -72,6 +79,15 @@ service cloud.firestore {
              data.status in ['pending', 'approved', 'rejected'];
     }
 
+    function isValidDocument(data) {
+      return hasRequiredFields(['title', 'url', 'type', 'created_at', 'created_by']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.url is string && data.url.size() > 0 &&
+             data.type is string &&
+             data.created_at is string &&
+             data.created_by is string;
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
@@ -79,7 +95,12 @@ service cloud.firestore {
     // Admins collection
     match /admins/{adminId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && (isAdmin() || request.resource.data.phone == '01796369416') && isValidUser(request.resource.data);
+      allow create: if isAuthenticated() && (
+        isAdmin() || 
+        (request.auth.uid == adminId && 
+         exists(/databases/$(database)/documents/admins/$(request.resource.data.phone)) &&
+         get(/databases/$(database)/documents/admins/$(request.resource.data.phone)).data.role == 'admin')
+      );
       allow update: if (isAdmin() || 
                     (exists(/databases/$(database)/documents/admins/$(adminId)) && 
                      get(/databases/$(database)/documents/admins/$(adminId)).data.firebase_uid == request.auth.uid) ||
@@ -91,7 +112,10 @@ service cloud.firestore {
     // Members collection
     match /members/{memberId} {
       allow read: if isAuthenticated();
-      allow create: if isAdmin() && isValidUser(request.resource.data);
+      allow create: if (isAdmin() && isValidUser(request.resource.data)) || 
+                    (isAuthenticated() && request.auth.uid == memberId && 
+                     exists(/databases/$(database)/documents/members/$(request.resource.data.phone)) &&
+                     get(/databases/$(database)/documents/members/$(request.resource.data.phone)).data.role == 'member');
       allow update: if (isAdmin() || isOwner(memberId) || 
                     (exists(/databases/$(database)/documents/members/$(memberId)) && 
                      get(/databases/$(database)/documents/members/$(memberId)).data.firebase_uid == request.auth.uid) ||
@@ -176,9 +200,17 @@ service cloud.firestore {
 
     // Terms, Developer, Contacts, Cash Entries
     match /terms/{id} { allow read: if true; allow write: if isAdmin(); }
-    match /developer/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /developer/{id} { allow read: if true; allow write: if isSuperAdmin(); }
     match /contacts/{id} { allow read: if isAuthenticated(); allow write: if isAdmin(); }
     match /cash_entries/{id} { allow read: if isAuthenticated(); allow write: if isAdmin(); }
+
+    // Documents
+    match /documents/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() && isValidDocument(request.resource.data);
+      allow update: if isAdmin() && isValidDocument(request.resource.data);
+      allow delete: if isAdmin();
+    }
 
     // Default deny
     match /{document=**} {

@@ -13,6 +13,7 @@ interface ModalProps {
   position?: 'center' | 'top-right' | 'bottom';
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'full';
   disableAnimation?: boolean;
+  noBlur?: boolean;
 }
 
 export const Modal: React.FC<ModalProps> = ({ 
@@ -25,11 +26,12 @@ export const Modal: React.FC<ModalProps> = ({
   noPadding,
   position = 'center',
   size = 'md',
-  disableAnimation = false
+  disableAnimation = false,
+  noBlur = false
 }) => {
   const positionClasses = {
     'center': 'items-center justify-center p-4',
-    'top-right': 'items-start justify-end pr-4 pt-18',
+    'top-right': 'items-start justify-end pr-3 pt-12',
     'bottom': 'items-end justify-center'
   };
 
@@ -68,7 +70,7 @@ export const Modal: React.FC<ModalProps> = ({
             exit={{ opacity: 0 }}
             onClick={onClose}
             transition={disableAnimation ? { duration: 0 } : {}}
-            className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
+            className={cn("absolute inset-0 bg-black/40", !noBlur && "backdrop-blur-[2px]")}
           />
           <motion.div
             {...motionProps}

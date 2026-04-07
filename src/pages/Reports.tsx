@@ -93,66 +93,6 @@ export const Reports: React.FC<ReportsProps> = ({ currentUser }) => {
 
   return (
     <div className="space-y-4 pb-10">
-      <h3 className="font-serif text-base font-bold flex items-center gap-2">
-        📊 রিপোর্ট ও পরিসংখ্যান
-      </h3>
-
-      {/* Summary Section */}
-      <div className="grid grid-cols-2 gap-3">
-        <Card className="bg-linear-to-br from-primary-dark to-primary text-white p-3">
-          <div className="flex justify-between items-start mb-2">
-            <div className="p-1.5 bg-white/20 rounded-lg"><Wallet className="w-4 h-4" /></div>
-            <div className="text-[10px] font-bold opacity-80">ফান্ড ব্যালেন্স</div>
-          </div>
-          <div className="text-lg font-black">৳{fmt(currentCash)}</div>
-          <div className="text-[9px] mt-1 opacity-70">বর্তমানে হাতে আছে</div>
-        </Card>
-
-        <Card className="bg-linear-to-br from-green-600 to-green-500 text-white p-3">
-          <div className="flex justify-between items-start mb-2">
-            <div className="p-1.5 bg-white/20 rounded-lg"><TrendingUp className="w-4 h-4" /></div>
-            <div className="text-[10px] font-bold opacity-80">মোট লাভ</div>
-          </div>
-          <div className="text-lg font-black">৳{fmt(totalProfit)}</div>
-          <div className="text-[9px] mt-1 opacity-70">বিনিয়োগ ও ঋণ থেকে</div>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-3">
-          <div className="bg-white p-3 rounded-2xl border border-app-border shadow-xs">
-            <div className="flex items-center gap-2 mb-1">
-              <ArrowUpRight className="w-3 h-3 text-green-600" />
-              <span className="text-[10px] font-bold text-app-text-secondary">মোট জমা</span>
-            </div>
-            <div className="text-sm font-black">৳{fmt(totalDeposits)}</div>
-          </div>
-          <div className="bg-white p-3 rounded-2xl border border-app-border shadow-xs">
-            <div className="flex items-center gap-2 mb-1">
-              <ArrowDownRight className="w-3 h-3 text-danger" />
-              <span className="text-[10px] font-bold text-app-text-secondary">মোট খরচ</span>
-            </div>
-            <div className="text-sm font-black">৳{fmt(totalExpenses)}</div>
-          </div>
-        </div>
-        <div className="space-y-3">
-          <div className="bg-white p-3 rounded-2xl border border-app-border shadow-xs">
-            <div className="flex items-center gap-2 mb-1">
-              <Banknote className="w-3 h-3 text-orange-600" />
-              <span className="text-[10px] font-bold text-app-text-secondary">ঋণ বিতরণ</span>
-            </div>
-            <div className="text-sm font-black">৳{fmt(totalLoansDisbursed)}</div>
-          </div>
-          <div className="bg-white p-3 rounded-2xl border border-app-border shadow-xs">
-            <div className="flex items-center gap-2 mb-1">
-              <PieChart className="w-3 h-3 text-blue-600" />
-              <span className="text-[10px] font-bold text-app-text-secondary">বিনিয়োগ</span>
-            </div>
-            <div className="text-sm font-black">৳{fmt(totalInvestmentsOut)}</div>
-          </div>
-        </div>
-      </div>
-
       {/* Excel Sheet Embed */}
       <Card className="p-0 overflow-hidden">
         <div className="p-3 px-4 bg-linear-to-r from-primary to-primary-light text-white flex items-center justify-between">
@@ -185,52 +125,6 @@ export const Reports: React.FC<ReportsProps> = ({ currentUser }) => {
         </div>
       </Card>
 
-      {/* Monthly Summary Table */}
-      <Card className="p-0 overflow-hidden">
-        <div className="p-3 px-4 bg-linear-to-br from-indigo-600 to-indigo-400 text-white">
-          <div className="text-sm font-bold flex items-center gap-2">
-            <PieChart className="w-4 h-4" /> মাসিক সারসংক্ষেপ ({year})
-          </div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-[10px]">
-            <thead>
-              <tr className="bg-app-bg-secondary border-b border-app-border">
-                <th className="p-2 text-left">মাস</th>
-                <th className="p-2 text-right">জমা</th>
-                <th className="p-2 text-right">ঋণ</th>
-                <th className="p-2 text-right">খরচ</th>
-                <th className="p-2 text-right">লাভ</th>
-              </tr>
-            </thead>
-            <tbody>
-              {months.map((mo, i) => {
-                const mDeps = deposits.filter(d => d.month === mo).reduce((s, d) => s + n(d.amount), 0);
-                const mLoans = loans.filter(l => l.date.startsWith(mo)).reduce((s, l) => s + n(l.amount), 0);
-                const mExps = expenses.filter(e => e.date.startsWith(mo)).reduce((s, e) => s + n(e.amount), 0);
-                const mInstProfit = installments.filter(inst => inst.date.startsWith(mo)).reduce((s, inst) => {
-                  const l = loans.find(ln => ln.id === inst.loan_id);
-                  if (!l || !l.total_payable || !l.total_interest) return s;
-                  return s + n(inst.amount) * (n(l.total_interest) / n(l.total_payable));
-                }, 0);
-                
-                if (mDeps === 0 && mLoans === 0 && mExps === 0 && mInstProfit === 0) return null;
-
-                return (
-                  <tr key={mo} className="border-b border-app-border last:border-0">
-                    <td className="p-2 font-bold">{mn[i]}</td>
-                    <td className="p-2 text-right text-primary font-bold">৳{fmt(mDeps)}</td>
-                    <td className="p-2 text-right text-orange-600">৳{fmt(mLoans)}</td>
-                    <td className="p-2 text-right text-danger">৳{fmt(mExps)}</td>
-                    <td className="p-2 text-right text-green-600 font-bold">৳{fmt(mInstProfit)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-
       {/* Member-wise Deposit */}
       <Card className="p-0 overflow-hidden">
         <div className="p-3 px-4 bg-linear-to-br from-primary-dark to-primary text-white">
@@ -254,7 +148,7 @@ export const Reports: React.FC<ReportsProps> = ({ currentUser }) => {
           </div>
         </div>
 
-        <div className="p-2 space-y-2">
+        <div className="p-2 space-y-2 max-h-[500px] overflow-y-auto scrollbar-hide">
           {members.length === 0 ? (
             <div className="text-center py-10 text-app-text-muted italic text-sm">কোনো সদস্য নেই</div>
           ) : viewMode === 'card' ? (
@@ -342,7 +236,7 @@ export const Reports: React.FC<ReportsProps> = ({ currentUser }) => {
             মোট ঋণ: ৳{fmt(totalLoansDisbursed)}
           </div>
         </div>
-        <div className="p-2 space-y-2">
+        <div className="p-2 space-y-2 max-h-[400px] overflow-y-auto scrollbar-hide">
           {loans.length === 0 ? (
             <div className="text-center py-6 text-app-text-muted italic text-sm">কোনো ঋণ নেই</div>
           ) : (

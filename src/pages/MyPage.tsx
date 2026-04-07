@@ -65,7 +65,7 @@ export const MyPage: React.FC<MyPageProps> = ({ currentUser, onEditProfile, onAc
     <div className="space-y-4">
       <div className="bg-linear-to-br from-primary-dark to-primary rounded-app p-5 text-white flex items-center gap-4 shadow-lg">
         <div className="w-[60px] h-[60px] rounded-full bg-white/20 flex items-center justify-center text-2xl font-bold overflow-hidden shrink-0 border-2 border-white/30">
-          {currentUser.photo ? <img src={currentUser.photo} alt={currentUser.name} className="w-full h-full object-cover" /> : currentUser.name[0].toUpperCase()}
+          {currentUser.photo ? <img src={currentUser.photo} alt={currentUser.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : currentUser.name[0].toUpperCase()}
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-lg font-bold truncate">{currentUser.name}</div>

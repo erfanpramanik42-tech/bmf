@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, addDoc, updateDoc, doc, getDocs, query, where } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, setDoc, doc, getDocs, query, where } from 'firebase/firestore';
 import { User, AppSettings, Loan } from '../types';
 import { Modal } from './Modal';
 import { Button } from './Button';
-import { hashPin } from '../lib/crypto';
+import { hashPin, normalizeDigits } from '../lib/crypto';
 
 interface ModalsProps {
   isAddMemberOpen: boolean;
@@ -59,6 +59,7 @@ export const Modals: React.FC<ModalsProps> = ({
   const [mPhone, setMPhone] = useState('');
   const [mPin, setMPin] = useState('');
   const [mAddress, setMAddress] = useState('');
+  const [mBirthday, setMBirthday] = useState('');
   const [mPhoto, setMPhoto] = useState('');
   const [mFather, setMFather] = useState('');
   const [mMother, setMMother] = useState('');
@@ -73,6 +74,7 @@ export const Modals: React.FC<ModalsProps> = ({
       setMName(editMember.name);
       setMPhone(editMember.phone);
       setMAddress(editMember.address || '');
+      setMBirthday(editMember.birthday || '');
       setMPhoto(editMember.photo || '');
       setMFather(editMember.father_name || '');
       setMMother(editMember.mother_name || '');
@@ -85,6 +87,7 @@ export const Modals: React.FC<ModalsProps> = ({
       setMName('');
       setMPhone('');
       setMAddress('');
+      setMBirthday('');
       setMPhoto('');
       setMFather('');
       setMMother('');
@@ -100,13 +103,15 @@ export const Modals: React.FC<ModalsProps> = ({
     if (!mName || !mPhone || (!mPin && !editMember)) { showToast('⚠️ নাম, ফোন ও পিন আবশ্যক'); return; }
     setMLoading(true);
     try {
-      const pin_hash = mPin ? await hashPin(mPhone, mPin) : (editMember?.pin_hash || '');
+      const normPhone = normalizeDigits(mPhone);
+      const pin_hash = mPin ? await hashPin(normPhone, mPin) : (editMember?.pin_hash || '');
       
       const memberData = {
         name: mName, 
-        phone: mPhone, 
+        phone: normPhone, 
         pin_hash, 
         address: mAddress, 
+        birthday: mBirthday,
         photo: mPhoto,
         father_name: mFather,
         mother_name: mMother,
@@ -117,11 +122,32 @@ export const Modals: React.FC<ModalsProps> = ({
       };
 
       if (editMember) {
-        const collectionName = editMember.role === 'admin' ? 'admins' : 'members';
-        await updateDoc(doc(db, collectionName, editMember.id), memberData);
-        showToast('✅ তথ্য আপডেট করা হয়েছে');
+        if (editMember.id === 'SUPER') {
+          // Update super admin config in settings
+          await updateDoc(doc(db, 'settings', 'main'), {
+            super_admin_phone: normPhone,
+            super_admin_pin_hash: pin_hash
+          });
+          
+          // Also save/update super admin profile in admins collection for consistency
+          // Use a fixed ID 'SUPER_ADMIN_PROFILE' for the document to avoid collisions with UIDs or phone numbers
+          const superProfileId = 'SUPER_ADMIN_PROFILE';
+          await setDoc(doc(db, 'admins', superProfileId), {
+            ...memberData,
+            role: 'admin',
+            isSuperAdmin: true,
+            firebase_uid: editMember.firebase_uid || '',
+            join_date: editMember.join_date || new Date().toISOString()
+          }, { merge: true });
+          
+          showToast('✅ সুপার এডমিন প্রোফাইল আপডেট হয়েছে');
+        } else {
+          const collectionName = editMember.role === 'admin' ? 'admins' : 'members';
+          await updateDoc(doc(db, collectionName, editMember.id), memberData);
+          showToast('✅ তথ্য আপডেট করা হয়েছে');
+        }
       } else {
-        await addDoc(collection(db, 'members'), {
+        await setDoc(doc(db, 'members', normPhone), {
           ...memberData,
           role: 'member', 
           join_date: new Date().toISOString().split('T')[0]
@@ -142,6 +168,14 @@ export const Modals: React.FC<ModalsProps> = ({
 
   const handleAddDeposit = async () => {
     if (!depMemberId || !depMonth || !depAmount) { showToast('⚠️ সব ঘর পূরণ করুন'); return; }
+    
+    // Prevent future month deposits
+    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+    if (depMonth > currentMonth) {
+      showToast('⚠️ আপনি আগামী মাসের জমা দিতে পারবেন না');
+      return;
+    }
+
     setDepLoading(true);
     try {
       // Check if deposit already exists for this month (excluding fines)
@@ -313,7 +347,7 @@ export const Modals: React.FC<ModalsProps> = ({
       <Modal 
         isOpen={isAddMemberOpen} 
         onClose={() => setIsAddMemberOpen(false)} 
-        title={editMember ? "👤 সদস্য তথ্য এডিট করুন" : "👤 নতুন সদস্য যোগ করুন"}
+        title={editMember ? (editMember.id === currentUser.id ? "👤 আমার প্রোফাইল এডিট করুন" : "👤 সদস্য তথ্য এডিট করুন") : "👤 নতুন সদস্য যোগ করুন"}
         position="bottom"
       >
         <div className="space-y-4 max-h-[70vh] overflow-y-auto px-1 pb-2">
@@ -349,6 +383,10 @@ export const Modals: React.FC<ModalsProps> = ({
             <div className="col-span-2">
               <label className="text-[11px] font-bold text-app-text-secondary mb-1 block">ঠিকানা</label>
               <input type="text" value={mAddress} onChange={(e) => setMAddress(e.target.value)} className="w-full p-3 border-2 border-app-border rounded-app-sm text-sm outline-none focus:border-primary transition-all" placeholder="বর্তমান ঠিকানা" />
+            </div>
+            <div className="col-span-2">
+              <label className="text-[11px] font-bold text-app-text-secondary mb-1 block">জন্মদিন</label>
+              <input type="date" value={mBirthday} onChange={(e) => setMBirthday(e.target.value)} className="w-full p-3 border-2 border-app-border rounded-app-sm text-sm outline-none focus:border-primary transition-all" />
             </div>
             <div>
               <label className="text-[11px] font-bold text-app-text-secondary mb-1 block">নমিনীর নাম</label>
@@ -414,7 +452,13 @@ export const Modals: React.FC<ModalsProps> = ({
           </div>
           <div>
             <label className="text-[11px] font-bold text-app-text-secondary mb-1 block">মাস *</label>
-            <input type="month" value={depMonth} onChange={(e) => setDepMonth(e.target.value)} className="w-full p-3 border-2 border-app-border rounded-app-sm text-sm outline-none focus:border-primary transition-all bg-white" />
+            <input 
+              type="month" 
+              value={depMonth} 
+              onChange={(e) => setDepMonth(e.target.value)} 
+              max={new Date().toISOString().slice(0, 7)}
+              className="w-full p-3 border-2 border-app-border rounded-app-sm text-sm outline-none focus:border-primary transition-all bg-white" 
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
